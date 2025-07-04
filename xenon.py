@@ -1864,46 +1864,55 @@ def add_node_ssh():
         )
         logger.info(f"SSH connection established to {server_ip} (User: {ssh_user}) {'via proxy' if use_proxy else ''}")
 
-        # 2. Execute hostname command
-        command = "hostname"
+        # 2. Execute curl command to get country
+        command = "curl -s ifconfig.co/country"
         logger.info(f"Executing remote command on {server_ip}: '{command}'")
-        stdin, stdout, stderr = ssh_client.exec_command(command, timeout=15) # 15s timeout for hostname
+        # Increased timeout slightly for curl command
+        stdin, stdout, stderr = ssh_client.exec_command(command, timeout=20)
 
         # It's important to read stdout and stderr before checking exit status
-        hostname_output = stdout.read().decode('utf-8', errors='ignore').strip()
+        country_output = stdout.read().decode('utf-8', errors='ignore').strip()
         stderr_output = stderr.read().decode('utf-8', errors='ignore').strip()
         exit_status = stdout.channel.recv_exit_status() # Blocks until command finishes
 
         logger.debug(f"Remote command '{command}' exit_status: {exit_status}")
-        if hostname_output:
-            logger.debug(f"Remote command stdout:\n{hostname_output}")
+        if country_output:
+            logger.debug(f"Remote command stdout (country):\n{country_output}")
         if stderr_output:
+            # stderr from curl can sometimes include progress, even with -s, or actual errors
             logger.warning(f"Remote command stderr:\n{stderr_output}")
 
-
         # 3. Process result
-        if exit_status == 0 and hostname_output:
-            logger.info(f"Successfully retrieved hostname '{hostname_output}' from {server_ip} for node '{node_name}'.")
-            # The message will be displayed as a notification by the frontend
-            success_message = f"Hostname for '{node_name}': {hostname_output}"
-            logger.info(f"Successfully retrieved hostname for node '{node_name}'. Notification message: \"{success_message}\"")
+        if exit_status == 0 and country_output:
+            # Example: country_output might be "US" or "Germany"
+            # Ensure the output is concise and suitable for a notification.
+            # ifconfig.co/country usually returns a short country name or code.
+            logger.info(f"Successfully retrieved country '{country_output}' from {server_ip} for node '{node_name}'.")
+            success_message = f"Country for '{node_name}': {country_output}"
+            logger.info(f"Notification message for node '{node_name}': \"{success_message}\"")
             return jsonify({
                 "success": True,
-                "message": success_message, # This message will be shown as notification
-                "hostname": hostname_output, # Retaining for any other potential frontend use
+                "message": success_message,
+                "country": country_output, # Include country for potential future use
                 "server_ip_used": server_ip
             })
-        elif exit_status == 0 and not hostname_output:
-            # Command succeeded but no output, which is unusual for hostname
-            error_message = f"Hostname command executed successfully on {server_ip} for node '{node_name}' but returned no output."
+        elif exit_status == 0 and not country_output:
+            # Command succeeded but no output. This could happen if ifconfig.co is down or unreachable.
+            error_message = f"Command to get country executed successfully on {server_ip} for node '{node_name}' but returned no output. The service ifconfig.co might be temporarily unavailable or blocked."
             logger.error(error_message)
-            return jsonify({"success": False, "message": error_message, "hostname": ""})
+            if stderr_output: # Add stderr if it has info
+                 error_message += f" (Details: {stderr_output})"
+            return jsonify({"success": False, "message": error_message, "country": ""})
         else:
             # Command failed
-            error_detail = stderr_output or "No error output"
-            error_message = f"Failed to retrieve hostname for node '{node_name}' on {server_ip}. Exit status: {exit_status}. Error: {error_detail}"
+            error_detail = stderr_output or "No error output from command."
+            # Check if curl is installed
+            if "curl: not found" in stderr_output or "curl: command not found" in stderr_output:
+                error_message = f"Failed to get country for node '{node_name}' on {server_ip}. 'curl' command not found on the remote server. Please install curl."
+            else:
+                error_message = f"Failed to get country for node '{node_name}' on {server_ip}. Exit status: {exit_status}. Error: {error_detail}"
             logger.error(error_message)
-            return jsonify({"success": False, "message": error_message, "hostname": ""})
+            return jsonify({"success": False, "message": error_message, "country": ""})
 
     except paramiko.AuthenticationException:
         err_msg = f"SSH Authentication failed for {ssh_user}@{server_ip}. Please check username/password."
@@ -1915,17 +1924,17 @@ def add_node_ssh():
         err_msg = f"SSH/Proxy connection error to {server_ip}: {err_type} - {str(e)}"
         logger.error(err_msg)
         # Provide a more user-friendly message for common issues
-        if isinstance(e, socket.timeout):
-            user_message = f"Connection to {server_ip} timed out. Check IP, port, and network."
+        if isinstance(e, socket.timeout): # This includes Paramiko's timeout on exec_command
+            user_message = f"Connection or command execution on {server_ip} timed out. Check IP, port, network, and if the server can reach ifconfig.co."
         elif isinstance(e, socks.ProxyConnectionError):
             user_message = f"Failed to connect to proxy {proxy_ip}:{proxy_port_str if use_proxy else 'N/A'}. {str(e)}"
         else:
-            user_message = f"Could not connect to {server_ip}. Check server details and network. Error: {str(e)}"
+            user_message = f"Could not connect to {server_ip} or execute command. Check server details and network. Error: {str(e)}"
         return jsonify({"success": False, "message": user_message}), 500 # 500 for server-side/network issues
     except Exception as e:
         # Catch-all for any other unexpected errors
         import traceback
-        logger.error(f"Unexpected error during hostname retrieval for '{node_name}' on {server_ip}: {str(e)}\n{traceback.format_exc()}")
+        logger.error(f"Unexpected error during country retrieval for '{node_name}' on {server_ip}: {str(e)}\n{traceback.format_exc()}")
         return jsonify({"success": False, "message": f"An unexpected error occurred: {str(e)}"}), 500
     finally:
         if ssh_client:

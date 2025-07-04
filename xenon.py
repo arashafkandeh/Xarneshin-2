@@ -1885,11 +1885,13 @@ def add_node_ssh():
         if exit_status == 0 and hostname_output:
             logger.info(f"Successfully retrieved hostname '{hostname_output}' from {server_ip} for node '{node_name}'.")
             # The message will be displayed as a notification by the frontend
+            success_message = f"Hostname for '{node_name}': {hostname_output}"
+            logger.info(f"Successfully retrieved hostname for node '{node_name}'. Notification message: \"{success_message}\"")
             return jsonify({
                 "success": True,
-                "message": f"Hostname for '{node_name}': {hostname_output}", # This message will be shown as notification
-                "hostname": hostname_output, # Include hostname for potential future use by frontend
-                "server_ip_used": server_ip # For clarity, if needed
+                "message": success_message, # This message will be shown as notification
+                "hostname": hostname_output, # Retaining for any other potential frontend use
+                "server_ip_used": server_ip
             })
         elif exit_status == 0 and not hostname_output:
             # Command succeeded but no output, which is unusual for hostname

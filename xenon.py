@@ -1866,7 +1866,6 @@ def add_node_ssh():
         )
         logger.info(f"SSH connection established to {server_ip} {'via proxy' if use_proxy else ''}")
 
-        # 2. Transfer setup_node.sh script via SFTP
         # 2. Execute hostname command
         full_command = "hostname"
         logger.info(f"Executing remote command on {server_ip}: {full_command}")
@@ -1894,11 +1893,11 @@ def add_node_ssh():
         elif exit_status == 0 and not stdout_output:
             error_message = f"Hostname command executed successfully but returned no output for node '{node_name}' on {server_ip}."
             logger.error(error_message)
-            return jsonify({"success": False, "message": error_message})
+            return jsonify({"success": False, "message": error_message, "hostname": ""})
         else:
             error_message = f"Failed to retrieve hostname for node '{node_name}' on {server_ip} (Exit: {exit_status}). Error: {stderr_output or 'Unknown error'}"
             logger.error(error_message)
-            return jsonify({"success": False, "message": error_message})
+            return jsonify({"success": False, "message": error_message, "hostname": ""})
 
     except paramiko.AuthenticationException:
         err_msg = "SSH Authentication failed. Please check username/password."

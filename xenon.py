@@ -1867,93 +1867,36 @@ def add_node_ssh():
         logger.info(f"SSH connection established to {server_ip} {'via proxy' if use_proxy else ''}")
 
         # 2. Transfer setup_node.sh script via SFTP
-        sftp_client = ssh_client.open_sftp()
-        logger.info(f"Uploading {local_script_path} to {remote_script_path} on {server_ip}")
-        sftp_client.put(local_script_path, remote_script_path)
-        sftp_client.chmod(remote_script_path, 0o755) # rwxr-xr-x
-        sftp_client.close()
-        sftp_client = None # Mark as closed
-        logger.info(f"Script uploaded and chmod +x set on {remote_script_path}")
+        # 2. Execute hostname command
+        full_command = "hostname"
+        logger.info(f"Executing remote command on {server_ip}: {full_command}")
 
-        # 3. Construct and execute the command
-        # Ensure node_certificate is base64 encoded for safe command line passing
-        client_pem_base64 = base64.b64encode(node_certificate.encode('utf-8')).decode('utf-8')
-
-        command_parts = ["sudo", "bash", remote_script_path]
-
-        # Add arguments. Note: f-string with single quotes inside for shell arguments that might contain spaces or special chars.
-        # However, for simple values, direct insertion is fine if we trust the source or validate it.
-        # For safety, if values can have spaces/special chars, quoting them (`f"'{value}'"`) is better.
-        # The script setup_node.sh uses simple shift for args, so complex quoting might not be needed if args are simple.
-
-        command_parts.extend(["--xray-version", selected_xray_version]) # No need for extra quotes if script handles it
-
-        if node_xray_port_str: # Only add if provided, script should have a default
-             command_parts.extend(["--node-port", node_xray_port_str])
-
-        command_parts.extend(["--client-pem-base64", client_pem_base64]) # Base64 is safe for CLI
-        command_parts.extend(["--server-ip", server_ip])
-
-        if use_proxy and proxy_ip and proxy_port_str:
-            proxy_port_int_for_cmd = int(proxy_port_str) # Ensure it's int for the command arg construction
-            command_parts.append("--use-proxy")
-            command_parts.extend(["--proxy-address", f"{proxy_ip}:{proxy_port_int_for_cmd}"])
-            if proxy_user:
-                command_parts.extend(["--proxy-user", proxy_user])
-            if proxy_password:
-                command_parts.extend(["--proxy-pass", proxy_password]) # Consider security implications
-
-        full_command = " ".join(command_parts)
-        # Redact sensitive parts for logging only
-        log_command = full_command.replace(client_pem_base64, '[CERT_BASE64_REDACTED]')
-        if proxy_password:
-            log_command = log_command.replace(proxy_password, '[PROXY_PASS_REDACTED]')
-        logger.info(f"Executing remote command on {server_ip}: {log_command}")
-
-        # Execute with a much longer timeout, e.g., 10 minutes (600 seconds)
-        # Note: exec_command is non-blocking for stdout/stderr reading initially.
-        # recv_exit_status() will block until command completion.
-        stdin, stdout, stderr = ssh_client.exec_command(full_command, timeout=600)
-
-        # It's better to read stdout/stderr in chunks if they can be very large,
-        # but for setup scripts, often reading at the end is fine if output isn't excessively verbose.
-        # For live feedback, a different approach (e.g., threads, async) would be needed here.
+        stdin, stdout, stderr = ssh_client.exec_command(full_command, timeout=30) # 30s timeout for hostname
 
         exit_status = stdout.channel.recv_exit_status() # Blocks until command finishes
 
-        stdout_output = stdout.read().decode('utf-8', errors='ignore')
-        stderr_output = stderr.read().decode('utf-8', errors='ignore')
+        stdout_output = stdout.read().decode('utf-8', errors='ignore').strip()
+        stderr_output = stderr.read().decode('utf-8', errors='ignore').strip()
 
-        logger.debug(f"Remote script stdout:\n{stdout_output}")
+        logger.debug(f"Remote command stdout:\n{stdout_output}")
         if stderr_output:
-            logger.error(f"Remote script stderr:\n{stderr_output}")
+            logger.error(f"Remote command stderr:\n{stderr_output}")
 
-        # 4. Clean up remote script
-        logger.info(f"Attempting to remove remote script {remote_script_path}")
-        ssh_client.exec_command(f"sudo rm -f {remote_script_path}")
-
-        # 5. Process result
-        if exit_status == 0 and "SETUP_SUCCESS" in stdout_output:
-            logger.info(f"Node setup script completed successfully on {server_ip} for '{node_name}'.")
-
-            # Extract Server_IP and Node_Port from output
-            final_server_ip = server_ip # Default to input server_ip
-            final_node_port = node_xray_port_str or "5566" # Default from script or input
-
-            for line in stdout_output.splitlines():
-                if line.startswith("Server_IP:"):
-                    final_server_ip = line.split(":", 1)[1].strip()
-                elif line.startswith("Node_Port:"):
-                    final_node_port = line.split(":", 1)[1].strip()
-
+        # 3. Process result
+        if exit_status == 0 and stdout_output:
+            logger.info(f"Successfully retrieved hostname '{stdout_output}' from {server_ip} for node '{node_name}'.")
             return jsonify({
                 "success": True,
-                "message": f"Node '{node_name}' setup successful.",
-                "server_ip_result": final_server_ip,
-                "node_port_result": final_node_port
+                "message": f"Successfully retrieved hostname for node '{node_name}'.",
+                "hostname": stdout_output,
+                "server_ip_result": server_ip # Keep original IP for consistency
             })
+        elif exit_status == 0 and not stdout_output:
+            error_message = f"Hostname command executed successfully but returned no output for node '{node_name}' on {server_ip}."
+            logger.error(error_message)
+            return jsonify({"success": False, "message": error_message})
         else:
-            error_message = f"Node setup script failed on '{node_name}' (Exit: {exit_status}). Error: {stderr_output or stdout_output or 'Unknown error'}"
+            error_message = f"Failed to retrieve hostname for node '{node_name}' on {server_ip} (Exit: {exit_status}). Error: {stderr_output or 'Unknown error'}"
             logger.error(error_message)
             return jsonify({"success": False, "message": error_message})
 

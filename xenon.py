@@ -1826,16 +1826,9 @@ def add_node_ssh():
     logger.info(f"  Selected Xray Version: {selected_xray_version}")
     logger.info(f"  Node Certificate: {'Provided' if node_certificate else 'Not Provided (Validation should catch this)'}")
 
-    # --- SFTP and Script Execution Logic ---
+    # --- SSH Connection and Hostname Retrieval ---
     ssh_client = None
-    sftp_client = None
     proxy_sock_for_ssh = None # For Paramiko's direct use
-    remote_script_path = "/tmp/setup_node.sh"
-    local_script_path = os.path.join(app.root_path, "assets", "setup_node.sh")
-
-    if not os.path.exists(local_script_path):
-        logger.error(f"Local setup script not found at {local_script_path}")
-        return jsonify({"success": False, "message": "Internal server error: Setup script missing."}), 500
 
     try:
         # 1. Establish SSH connection (direct or via proxy)
@@ -1844,80 +1837,101 @@ def add_node_ssh():
 
         if use_proxy:
             if not proxy_ip or not proxy_port_str: # Should be caught by client, but double check
+                logger.error("Proxy IP and Port are required when 'Use Proxy' is enabled for SSH.")
                 return jsonify({"success": False, "message": "Proxy IP and Port are required when 'Use Proxy' is enabled."}), 400
             try:
                 proxy_port_int = int(proxy_port_str)
                 if not (1 <= proxy_port_int <= 65535): raise ValueError("Invalid proxy port range")
             except ValueError:
+                logger.error(f"Invalid Proxy Port for SSH connection: {proxy_port_str}")
                 return jsonify({"success": False, "message": "Invalid Proxy Port for SSH connection."}), 400
 
-            logger.info(f"Setting up SOCKS proxy for SSH connection to {proxy_ip}:{proxy_port_int}")
+            logger.info(f"Setting up SOCKS proxy for SSH connection via {proxy_ip}:{proxy_port_int}")
             proxy_sock_for_ssh = socks.socksocket()
             proxy_sock_for_ssh.set_proxy(
                 socks.SOCKS5, proxy_ip, proxy_port_int,
                 username=proxy_user if proxy_user else None,
                 password=proxy_password if proxy_password else None
             )
-            proxy_sock_for_ssh.connect((server_ip, ssh_port))
+            # Connect the SOCKS socket to the target SSH server
+            proxy_sock_for_ssh.connect((server_ip, ssh_port)) # This is crucial
 
+        # Connect Paramiko client, using the proxy socket if configured
         ssh_client.connect(
             hostname=server_ip, port=ssh_port, username=ssh_user, password=ssh_password,
-            sock=proxy_sock_for_ssh, timeout=20, banner_timeout=20, auth_timeout=20
+            sock=proxy_sock_for_ssh, # Pass the connected SOCKS socket here
+            timeout=20, banner_timeout=20, auth_timeout=20
         )
-        logger.info(f"SSH connection established to {server_ip} {'via proxy' if use_proxy else ''}")
+        logger.info(f"SSH connection established to {server_ip} (User: {ssh_user}) {'via proxy' if use_proxy else ''}")
 
         # 2. Execute hostname command
-        full_command = "hostname"
-        logger.info(f"Executing remote command on {server_ip}: {full_command}")
+        command = "hostname"
+        logger.info(f"Executing remote command on {server_ip}: '{command}'")
+        stdin, stdout, stderr = ssh_client.exec_command(command, timeout=15) # 15s timeout for hostname
 
-        stdin, stdout, stderr = ssh_client.exec_command(full_command, timeout=30) # 30s timeout for hostname
-
+        # It's important to read stdout and stderr before checking exit status
+        hostname_output = stdout.read().decode('utf-8', errors='ignore').strip()
+        stderr_output = stderr.read().decode('utf-8', errors='ignore').strip()
         exit_status = stdout.channel.recv_exit_status() # Blocks until command finishes
 
-        stdout_output = stdout.read().decode('utf-8', errors='ignore').strip()
-        stderr_output = stderr.read().decode('utf-8', errors='ignore').strip()
-
-        logger.debug(f"Remote command stdout:\n{stdout_output}")
+        logger.debug(f"Remote command '{command}' exit_status: {exit_status}")
+        if hostname_output:
+            logger.debug(f"Remote command stdout:\n{hostname_output}")
         if stderr_output:
-            logger.error(f"Remote command stderr:\n{stderr_output}")
+            logger.warning(f"Remote command stderr:\n{stderr_output}")
+
 
         # 3. Process result
-        if exit_status == 0 and stdout_output:
-            logger.info(f"Successfully retrieved hostname '{stdout_output}' from {server_ip} for node '{node_name}'.")
+        if exit_status == 0 and hostname_output:
+            logger.info(f"Successfully retrieved hostname '{hostname_output}' from {server_ip} for node '{node_name}'.")
+            # The message will be displayed as a notification by the frontend
             return jsonify({
                 "success": True,
-                "message": f"Successfully retrieved hostname for node '{node_name}'.",
-                "hostname": stdout_output,
-                "server_ip_result": server_ip # Keep original IP for consistency
+                "message": f"Hostname for '{node_name}': {hostname_output}", # This message will be shown as notification
+                "hostname": hostname_output, # Include hostname for potential future use by frontend
+                "server_ip_used": server_ip # For clarity, if needed
             })
-        elif exit_status == 0 and not stdout_output:
-            error_message = f"Hostname command executed successfully but returned no output for node '{node_name}' on {server_ip}."
+        elif exit_status == 0 and not hostname_output:
+            # Command succeeded but no output, which is unusual for hostname
+            error_message = f"Hostname command executed successfully on {server_ip} for node '{node_name}' but returned no output."
             logger.error(error_message)
             return jsonify({"success": False, "message": error_message, "hostname": ""})
         else:
-            error_message = f"Failed to retrieve hostname for node '{node_name}' on {server_ip} (Exit: {exit_status}). Error: {stderr_output or 'Unknown error'}"
+            # Command failed
+            error_detail = stderr_output or "No error output"
+            error_message = f"Failed to retrieve hostname for node '{node_name}' on {server_ip}. Exit status: {exit_status}. Error: {error_detail}"
             logger.error(error_message)
             return jsonify({"success": False, "message": error_message, "hostname": ""})
 
     except paramiko.AuthenticationException:
-        err_msg = "SSH Authentication failed. Please check username/password."
-        logger.error(f"{err_msg} for {ssh_user}@{server_ip}")
-        return jsonify({"success": False, "message": err_msg}), 401
-    except (paramiko.SSHException, socket.error, socks.ProxyError) as e: # Catch various connection/SSH errors
-        err_msg = f"SSH/Proxy connection error: {str(e)}"
-        logger.error(f"{err_msg} for {server_ip}")
-        return jsonify({"success": False, "message": err_msg}), 500
+        err_msg = f"SSH Authentication failed for {ssh_user}@{server_ip}. Please check username/password."
+        logger.error(err_msg)
+        return jsonify({"success": False, "message": err_msg}), 401 # 401 for auth failure
+    except (paramiko.SSHException, socket.timeout, socket.error, socks.ProxyConnectionError, socks.GeneralProxyError) as e:
+        # Catch various connection, SSH, or SOCKS proxy errors
+        err_type = type(e).__name__
+        err_msg = f"SSH/Proxy connection error to {server_ip}: {err_type} - {str(e)}"
+        logger.error(err_msg)
+        # Provide a more user-friendly message for common issues
+        if isinstance(e, socket.timeout):
+            user_message = f"Connection to {server_ip} timed out. Check IP, port, and network."
+        elif isinstance(e, socks.ProxyConnectionError):
+            user_message = f"Failed to connect to proxy {proxy_ip}:{proxy_port_str if use_proxy else 'N/A'}. {str(e)}"
+        else:
+            user_message = f"Could not connect to {server_ip}. Check server details and network. Error: {str(e)}"
+        return jsonify({"success": False, "message": user_message}), 500 # 500 for server-side/network issues
     except Exception as e:
+        # Catch-all for any other unexpected errors
         import traceback
-        logger.error(f"Unexpected error during node setup for '{node_name}': {str(e)}\n{traceback.format_exc()}")
+        logger.error(f"Unexpected error during hostname retrieval for '{node_name}' on {server_ip}: {str(e)}\n{traceback.format_exc()}")
         return jsonify({"success": False, "message": f"An unexpected error occurred: {str(e)}"}), 500
     finally:
-        if sftp_client:
-            sftp_client.close()
         if ssh_client:
             ssh_client.close()
+            logger.debug("SSH client closed.")
         if proxy_sock_for_ssh: # This is the SOCKS socket created for Paramiko
             proxy_sock_for_ssh.close()
+            logger.debug("Proxy socket for SSH closed.")
 
 ##############
 ############## Xray reverse

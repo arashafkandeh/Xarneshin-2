@@ -932,7 +932,7 @@
               <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
               <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
             </svg>
-            Installing node... Please wait.
+            Fetching hostname... Please wait.
           `;
           // Clear previous results from test connection span
           proxyTestResultSpan.textContent = '';
@@ -948,33 +948,36 @@
               body: JSON.stringify(data),
             });
 
-            // No need to check response.ok here if server always returns JSON with a success field
             const result = await response.json();
 
             if (result.success) {
-              let resultMessage = `<strong>Node '${data.nodeName}' setup successful!</strong><br>`;
-              const serverIpFromResult = result.server_ip_result || data.serverIP; // Fallback to original IP if not in result
-              const nodePortFromResult = result.node_port_result || data.nodeXrayPort || 'N/A'; // Fallback or N/A
+              let resultMessage = `<strong>Hostname for '${data.nodeName}' retrieved successfully!</strong><br>`;
+              const serverIpFromResult = result.server_ip_result || data.serverIP;
+              const hostnameFromResult = result.hostname || 'N/A';
 
               resultMessage += `Server IP: <code class="bg-gray-700 px-1 rounded break-all">${serverIpFromResult}</code><br>`;
-              resultMessage += `Node Port: <code class="bg-gray-700 px-1 rounded">${nodePortFromResult}</code>`;
+              resultMessage += `Hostname: <code class="bg-gray-700 px-1 rounded break-all">${hostnameFromResult}</code>`;
 
-              const finalMessage = `${resultMessage}<br><button type="button" onclick="copyToClipboard('${serverIpFromResult}', '${nodePortFromResult}')" class="mt-2 text-xs bg-blue-500 hover:bg-blue-600 text-white py-1 px-2 rounded shadow focus:outline-none focus:ring-2 focus:ring-blue-400">Copy Details</button>`;
+              const finalMessage = `${resultMessage}<br><button type="button" onclick="copyHostnameDetails('${serverIpFromResult}', '${hostnameFromResult}')" class="mt-2 text-xs bg-blue-500 hover:bg-blue-600 text-white py-1 px-2 rounded shadow focus:outline-none focus:ring-2 focus:ring-blue-400">Copy Details</button>`;
 
               proxyTestResultSpan.innerHTML = finalMessage;
               proxyTestResultSpan.className = 'text-sm text-green-400 block mt-2 p-2 bg-gray-800/50 rounded';
 
-              showNotification(`Node '${data.nodeName}' setup process finished. See details in modal.`);
-              // Modal remains open for user to copy details.
+              showNotification(`Hostname for '${data.nodeName}' retrieved. See details in modal.`);
             } else {
-              showNotification(result.message || 'Failed to setup node.');
-              proxyTestResultSpan.textContent = `Error: ${result.message || 'Unknown error during setup.'}`;
+              showNotification(result.message || 'Failed to retrieve hostname.');
+              proxyTestResultSpan.textContent = `Error: ${result.message || 'Unknown error.'}`;
+              if (result.hostname !== undefined && result.hostname !== "") {
+                proxyTestResultSpan.textContent += ` (Hostname: ${result.hostname})`;
+              } else if (result.hostname === "") {
+                 proxyTestResultSpan.textContent += ` (Hostname: Not available or empty)`;
+              }
               proxyTestResultSpan.className = 'text-sm text-red-400 block mt-2 p-2 bg-red-900/30 rounded';
             }
           } catch (error) {
-            console.error('Error setting up node:', error);
-            showNotification(`Setup Error: ${error.message}`);
-            proxyTestResultSpan.textContent = `Setup Error: ${error.message}`;
+            console.error('Error retrieving hostname:', error);
+            showNotification(`Error: ${error.message}`);
+            proxyTestResultSpan.textContent = `Error: ${error.message}`;
             proxyTestResultSpan.className = 'text-sm text-red-400 block mt-2 p-2 bg-red-900/30 rounded';
           } finally {
             submitButton.disabled = false;
@@ -982,8 +985,8 @@
           }
         }
 
-        function copyToClipboard(ip, port) {
-          const textToCopy = `Server IP: ${ip}\nNode Port: ${port}`;
+        function copyHostnameDetails(ip, hostname) {
+          const textToCopy = `Server IP: ${ip}\nHostname: ${hostname}`;
           navigator.clipboard.writeText(textToCopy).then(() => {
             showNotification('Details copied to clipboard!');
           }).catch(err => {

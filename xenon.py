@@ -1830,12 +1830,6 @@ def add_node_ssh():
     ssh_client = None
     sftp_client = None
     proxy_sock_for_ssh = None # For Paramiko's direct use
-    remote_script_path = "/tmp/setup_node.sh"
-    local_script_path = os.path.join(app.root_path, "assets", "setup_node.sh")
-
-    if not os.path.exists(local_script_path):
-        logger.error(f"Local setup script not found at {local_script_path}")
-        return jsonify({"success": False, "message": "Internal server error: Setup script missing."}), 500
 
     try:
         # 1. Establish SSH connection (direct or via proxy)

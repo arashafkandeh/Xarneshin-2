@@ -963,7 +963,7 @@
               proxyTestResultSpan.innerHTML = finalMessage;
               proxyTestResultSpan.className = 'text-sm text-green-400 block mt-2 p-2 bg-gray-800/50 rounded';
 
-              showNotification(`Hostname for '${data.nodeName}' retrieved. See details in modal.`);
+              showNotification(`Hostname '${hostnameFromResult}' for node '${data.nodeName}' retrieved.`);
             } else {
               showNotification(result.message || 'Failed to retrieve hostname.');
               proxyTestResultSpan.textContent = `Error: ${result.message || 'Unknown error.'}`;

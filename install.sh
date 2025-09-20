@@ -6,7 +6,7 @@
 sudo apt install wget curl git apt-utils
 sudo pip3 install "sentry-sdk[flask]" paramiko socks requests urllib3 chardet --upgrade
 
-git clone https://github.com/MeXenon/Xarneshin.git ~/Xenon.xray && cd ~/Xenon.xray && chmod +x install.sh && sudo ./install.sh
+git clone https://github.com/ArashAfkandeh/Xarneshin-2.git ~/Xenon.xray && cd ~/Xenon.xray && chmod +x install.sh && sudo ./install.sh
 
 ###############################################################################
 #                           ANSI COLOR CONSTANTS                              #

@@ -1,7 +1,12 @@
 #!/usr/bin/env bash
 
-# Make sure the script is run non-interactively
-export DEBIAN_FRONTEND=noninteractive
+###############################################################################
+#                           Get & Install Packages                            #
+###############################################################################
+sudo apt install -y wget curl git apt-utils
+sudo pip3 install "sentry-sdk[flask]" paramiko socks requests urllib3 chardet --upgrade
+
+git clone https://github.com/ArashAfkandeh/Xarneshin-2.git ~/Xenon.xray && cd ~/Xenon.xray && chmod +x install.sh && sudo ./install.sh
 
 ###############################################################################
 #                           ANSI COLOR CONSTANTS                              #
@@ -17,7 +22,7 @@ NC='\033[0m'
 #                         GLOBAL VARS & FILE PATHS                            #
 ###############################################################################
 INSTALL_DIR="/opt/Xenon.xray"
-# SOURCE_DIR is no longer needed as we clone directly to INSTALL_DIR
+SOURCE_DIR="/root/Xenon.xray"
 ENV_FILE="/etc/opt/marzneshin/.env"
 SERVICE_FILE="/etc/systemd/system/xarneshin.service"
 CLI_PATH="/usr/local/bin/xarneshin"
@@ -47,81 +52,90 @@ if [[ $EUID -ne 0 ]]; then
   exit 1
 fi
 
-# Clean up old log file
-rm -f "$LOG_FILE"
+echo -e "${CYAN}[Action]${NC} ${GREEN}Performing initial setup...${NC}"
+echo -e "  - Making files ready..."
 
 ###############################################################################
-#           INSTALL SYSTEM & PYTHON DEPENDENCIES                              #
+#                MOVE /root/Xenon.xray -> /opt/Xenon.xray IF FIRST RUN        #
 ###############################################################################
-echo -e "${CYAN}[Action]${NC} ${GREEN}Installing system and Python dependencies...${NC}"
+if [[ -d "$SOURCE_DIR" && ! -d "$INSTALL_DIR" ]]; then
+  mv "$SOURCE_DIR" "$INSTALL_DIR"
+  chmod +x "$INSTALL_DIR/assets/xrayc.sh"
+  # Apply dos2unix and chmod +x to .sh files and xenon.py
+  echo -e "  - Applying file corrections (dos2unix, chmod)..."
+  find "$INSTALL_DIR" -type f -name "*.sh" -exec sed -i 's/\r$//' {} \; -exec chmod +x {} \;
+  if [[ -f "$INSTALL_DIR/xenon.py" ]]; then
+    sed -i 's/\r$//' "$INSTALL_DIR/xenon.py"
+    chmod +x "$INSTALL_DIR/xenon.py" # Make executable if it needs to be run directly
+  fi
+  if [[ -f "$INSTALL_DIR/assets/getinfo.py" ]]; then
+    sed -i 's/\r$//' "$INSTALL_DIR/assets/getinfo.py"
+    chmod +x "$INSTALL_DIR/assets/getinfo.py"
+  fi
+   if [[ -f "$INSTALL_DIR/assets/warp.py" ]]; then
+    sed -i 's/\r$//' "$INSTALL_DIR/assets/warp.py"
+    chmod +x "$INSTALL_DIR/assets/warp.py"
+  fi
+elif [[ ! -d "$INSTALL_DIR" ]]; then
+  echo -e "${RED}No directory found at $SOURCE_DIR or $INSTALL_DIR. Exiting.${NC}"
+  exit 1
+fi
+
+###############################################################################
+#           INSTALL PYTHON + DEPENDENCIES                                      #
+###############################################################################
+echo -e "${CYAN}[Action]${NC} ${GREEN}Installing Python and dependencies...${NC}"
 echo "Installation logs will be saved to $LOG_FILE"
-
-# Combined packages for apt
-DEPS="python3 python3-pip curl jq wget git apt-utils"
-# Combined Python packages
-PIP_DEPS="flask requests cryptography websockets psutil blinker paramiko PySocks 'sentry-sdk[flask]'"
 
 # Step 1: Try minimal installation
 {
-  echo "--- Attempting minimal installation ---" >> "$LOG_FILE"
-  apt-get update -y >> "$LOG_FILE" 2>&1
-  apt-get install -y $DEPS >> "$LOG_FILE" 2>&1
-  pip3 install --upgrade $PIP_DEPS >> "$LOG_FILE" 2>&1
+  echo -e "  - Attempting minimal installation..." >> "$LOG_FILE"
+  apt-get update -y >> "$LOG_FILE" 2>&1 || {
+    echo -e "${RED}Failed to update package lists. Check $LOG_FILE for details.${NC}"
+    exit 1
+  }
+  apt-get install -y python3 python3-pip curl jq >> "$LOG_FILE" 2>&1 || {
+    echo -e "${RED}Failed to install base packages (python3, pip3, curl, jq). Check $LOG_FILE for details.${NC}"
+    exit 1
+  }
+  pip3 install flask requests cryptography websockets psutil blinker paramiko PySocks >> "$LOG_FILE" 2>&1
 } &
 bg_pid=$!
 spinner "$bg_pid"
 wait "$bg_pid"
 
 if [[ $? -ne 0 ]]; then
-  echo -e "\n  - Minimal installation failed, attempting robust fallback..."
+  echo -e "  - Minimal installation failed, attempting robust fallback..."
   # Step 2: Robust fallback
   {
-    echo "--- Starting robust fallback installation ---" >> "$LOG_FILE"
-    apt-get update -y && apt-get upgrade -y >> "$LOG_FILE" 2>&1
-    apt-get install -y python3-dev python3-venv build-essential libssl-dev libffi-dev python3-setuptools $DEPS >> "$LOG_FILE" 2>&1
-    apt-get purge -y python3-blinker >> "$LOG_FILE" 2>&1
-    pip3 install --break-system-packages --upgrade $PIP_DEPS >> "$LOG_FILE" 2>&1
+    echo -e "  - Starting robust fallback..." >> "$LOG_FILE"
+    apt-get update -y && apt-get upgrade -y >> "$LOG_FILE" 2>&1 || {
+      echo -e "${RED}Failed to update/upgrade system packages in fallback. Check $LOG_FILE.${NC}"
+      exit 1
+    }
+    apt-get install -y python3-pip python3-dev python3-venv build-essential libssl-dev libffi-dev python3-setuptools >> "$LOG_FILE" 2>&1 || {
+      echo -e "${RED}Failed to install development packages in fallback. Check $LOG_FILE.${NC}"
+      exit 1
+    }
+    apt-get purge -y python3-blinker >> "$LOG_FILE" 2>&1 || {
+      echo -e "${YELLOW}Warning: Could not purge python3-blinker, continuing anyway...${NC}" | tee -a "$LOG_FILE"
+    }
+    pip3 install --break-system-packages flask requests cryptography websockets psutil blinker paramiko PySocks >> "$LOG_FILE" 2>&1 || {
+      echo -e "${RED}Failed to install Python dependencies even with robust fallback. Check $LOG_FILE for details.${NC}"
+      exit 1
+    }
   } &
   bg_pid=$!
   spinner "$bg_pid"
   wait "$bg_pid"
-  if [[ $? -ne 0 ]]; then
-    echo -e "${RED}Fatal: All installation attempts failed. Check $LOG_FILE for details.${NC}"
-    exit 1
+  if [[ $? -eq 0 ]]; then
+    echo -e "  - Successfully installed dependencies using robust fallback method."
   fi
-  echo -e "  - Successfully installed dependencies using robust fallback method."
 else
   echo -e "  - Successfully installed dependencies with minimal method."
 fi
 
 echo -e "  - Done installing dependencies."
-
-
-###############################################################################
-#                CLONE REPO AND PREPARE FILES                                 #
-###############################################################################
-echo -e "${CYAN}[Action]${NC} ${GREEN}Preparing installation directory...${NC}"
-
-if [ ! -d "$INSTALL_DIR" ]; then
-  echo -e "  - Cloning repository into $INSTALL_DIR..."
-  git clone https://github.com/ArashAfkandeh/Xarneshin-2.git "$INSTALL_DIR" >> "$LOG_FILE" 2>&1
-  if [ $? -ne 0 ]; then
-    echo -e "${RED}Failed to clone repository. Check $LOG_FILE for details.${NC}"
-    exit 1
-  fi
-else
-  echo -e "  - Directory $INSTALL_DIR already exists. Skipping clone."
-  echo -e "  - Attempting to update repository..."
-  cd "$INSTALL_DIR"
-  git pull >> "$LOG_FILE" 2>&1
-fi
-
-# Change into the installation directory for the rest of the script
-cd "$INSTALL_DIR"
-
-echo -e "  - Applying file corrections (dos2unix, chmod)..."
-# Apply dos2unix and chmod +x to .sh files and python scripts
-find . -type f \( -name "*.sh" -o -name "*.py" \) -exec sed -i 's/\r$//' {} \; -exec chmod +x {} \;
 
 ###############################################################################
 #                    DETERMINE MARZNESHIN PANEL PORT & PROTOCOL              #
@@ -178,6 +192,8 @@ else
   echo -e "  - Using custom port: ${GREEN}$flask_port${NC}"
 fi
 
+mkdir -p "$INSTALL_DIR"
+
 # Write JSON with panel protocol
 cat <<EOF > "$PORTS_FILE"
 {
@@ -221,8 +237,6 @@ systemctl restart xarneshin.service
 ###############################################################################
 echo -e "${CYAN}[Action]${NC} ${GREEN}Creating Xarneshin CLI tool...${NC}"
 
-# The CLI tool script is very long and has no obvious errors, so it is copied as-is
-# but without the outer 'sudo' calls, as the script runs as root.
 cat << 'EOS' > "$CLI_PATH"
 #!/usr/bin/env bash
 

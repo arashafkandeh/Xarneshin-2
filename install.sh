@@ -71,7 +71,7 @@ if [[ -d "$SOURCE_DIR" && ! -d "$INSTALL_DIR" ]]; then
     sed -i 's/\r$//' "$INSTALL_DIR/assets/getinfo.py"
     chmod +x "$INSTALL_DIR/assets/getinfo.py"
   fi
-   if [[ -f "$INSTALL_DIR/assets/warp.py" ]]; then
+  if [[ -f "$INSTALL_DIR/assets/warp.py" ]]; then
     sed -i 's/\r$//' "$INSTALL_DIR/assets/warp.py"
     chmod +x "$INSTALL_DIR/assets/warp.py"
   fi

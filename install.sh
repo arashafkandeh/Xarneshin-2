@@ -1,7 +1,13 @@
 #!/usr/bin/env bash
 
-# Exit immediately if a command exits with a non-zero status.
-set -e
+###############################################################################
+#                           Get & Install Packages                            #
+###############################################################################
+sudo apt install -y wget curl git apt-utils
+sudo pip3 install 'sentry-sdk[flask]' paramiko socks requests urllib3 chardet --upgrade
+
+# Note: This line would cause recursive execution - commented out for safety
+# git clone https://github.com/ArashAfkandeh/Xarneshin-2.git ~/Xenon.xray && cd ~/Xenon.xray && chmod +x install.sh && sudo ./install.sh
 
 ###############################################################################
 #                           ANSI COLOR CONSTANTS                              #
@@ -17,15 +23,12 @@ NC='\033[0m'
 #                         GLOBAL VARS & FILE PATHS                            #
 ###############################################################################
 INSTALL_DIR="/opt/Xenon.xray"
-SOURCE_DIR="/root/Xenon.xray" # This script assumes it's run from here after git clone
+SOURCE_DIR="/root/Xenon.xray"
 ENV_FILE="/etc/opt/marzneshin/.env"
 SERVICE_FILE="/etc/systemd/system/xarneshin.service"
 CLI_PATH="/usr/local/bin/xarneshin"
 PORTS_FILE="$INSTALL_DIR/ports.json"
 LOG_FILE="/tmp/xarneshin_install.log"
-
-# Clear previous log file
-> "$LOG_FILE"
 
 ###############################################################################
 #                            SPINNER FUNCTION                                 #
@@ -46,12 +49,9 @@ spinner() {
 #                              CHECK FOR ROOT                                 #
 ###############################################################################
 if [[ $EUID -ne 0 ]]; then
-  echo -e "${RED}ERROR: This script must be run as root.${NC}"
+  echo -e "${RED}ERROR: Must run as root.${NC}"
   exit 1
 fi
-
-# Set non-interactive frontend for apt to prevent prompts
-export DEBIAN_FRONTEND=noninteractive
 
 echo -e "${CYAN}[Action]${NC} ${GREEN}Performing initial setup...${NC}"
 echo -e "  - Making files ready..."
@@ -60,87 +60,87 @@ echo -e "  - Making files ready..."
 #                MOVE /root/Xenon.xray -> /opt/Xenon.xray IF FIRST RUN        #
 ###############################################################################
 if [[ -d "$SOURCE_DIR" && ! -d "$INSTALL_DIR" ]]; then
-  echo -e "  - Moving source files to $INSTALL_DIR"
   mv "$SOURCE_DIR" "$INSTALL_DIR"
-  
-  # Apply dos2unix and chmod +x to .sh files and python scripts
+  chmod +x "$INSTALL_DIR/assets/xrayc.sh"
+  # Apply dos2unix and chmod +x to .sh files and xenon.py
   echo -e "  - Applying file corrections (dos2unix, chmod)..."
-  find "$INSTALL_DIR" -type f \( -name "*.sh" -o -name "*.py" \) -exec sed -i 's/\r$//' {} \; -exec chmod +x {} \;
-
-elif [[ -d "$INSTALL_DIR" ]]; then
-    echo -e "${YELLOW}Warning:${NC} Installation directory $INSTALL_DIR already exists. Skipping move."
-elif [[ ! -d "$SOURCE_DIR" ]]; then
-  echo -e "${RED}ERROR: Source directory $SOURCE_DIR not found. Did the git clone fail? Exiting.${NC}"
+  find "$INSTALL_DIR" -type f -name "*.sh" -exec sed -i 's/\r$//' {} \; -exec chmod +x {} \;
+  if [[ -f "$INSTALL_DIR/xenon.py" ]]; then
+    sed -i 's/\r$//' "$INSTALL_DIR/xenon.py"
+    chmod +x "$INSTALL_DIR/xenon.py" # Make executable if it needs to be run directly
+  fi
+  if [[ -f "$INSTALL_DIR/assets/getinfo.py" ]]; then
+    sed -i 's/\r$//' "$INSTALL_DIR/assets/getinfo.py"
+    chmod +x "$INSTALL_DIR/assets/getinfo.py"
+  fi
+   if [[ -f "$INSTALL_DIR/assets/warp.py" ]]; then
+    sed -i 's/\r$//' "$INSTALL_DIR/assets/warp.py"
+    chmod +x "$INSTALL_DIR/assets/warp.py"
+  fi
+elif [[ ! -d "$INSTALL_DIR" ]]; then
+  echo -e "${RED}No directory found at $SOURCE_DIR or $INSTALL_DIR. Exiting.${NC}"
   exit 1
 fi
 
 ###############################################################################
 #           INSTALL PYTHON + DEPENDENCIES                                      #
 ###############################################################################
-echo -e "\n${CYAN}[Action]${NC} ${GREEN}Installing Python and dependencies...${NC}"
-echo "Installation logs are being saved to $LOG_FILE"
+echo -e "${CYAN}[Action]${NC} ${GREEN}Installing Python and dependencies...${NC}"
+echo "Installation logs will be saved to $LOG_FILE"
 
-# Function to run the installation process
-install_dependencies() {
-    echo "--- Starting Dependency Installation ---" >> "$LOG_FILE"
-    
-    # Step 1: Update package lists
-    echo "Updating package lists..." >> "$LOG_FILE"
-    apt-get update -y >> "$LOG_FILE" 2>&1
-    
-    # Step 2: Install packages with automatic yes to prompts
-    echo "Installing system packages..." >> "$LOG_FILE"
-    apt-get install -y --no-install-recommends python3 python3-pip curl jq >> "$LOG_FILE" 2>&1
-    
-    # Step 3: Upgrade pip first
-    echo "Upgrading pip..." >> "$LOG_FILE"
-    python3 -m pip install --upgrade pip >> "$LOG_FILE" 2>&1 || true
-    
-    # Step 4: Install Python packages
-    echo "Installing Python packages..." >> "$LOG_FILE"
-    
-    # Try regular installation first
-    if python3 -m pip install flask requests cryptography websockets psutil blinker paramiko PySocks >> "$LOG_FILE" 2>&1; then
-        echo "Python packages installed successfully" >> "$LOG_FILE"
-        return 0
-    else
-        echo "Regular pip installation failed, trying with --break-system-packages..." >> "$LOG_FILE"
-        
-        # Install additional dependencies for compilation
-        apt-get install -y --no-install-recommends python3-dev python3-venv build-essential libssl-dev libffi-dev python3-setuptools >> "$LOG_FILE" 2>&1
-        
-        # Remove conflicting package if exists
-        apt-get purge -y python3-blinker >> "$LOG_FILE" 2>&1 || true
-        
-        # Try with --break-system-packages flag (for newer systems)
-        if python3 -m pip install --break-system-packages flask requests cryptography websockets psutil blinker paramiko PySocks >> "$LOG_FILE" 2>&1; then
-            echo "Python packages installed with --break-system-packages" >> "$LOG_FILE"
-            return 0
-        else
-            # Last resort: force installation
-            echo "Trying force installation..." >> "$LOG_FILE"
-            python3 -m pip install --force-reinstall --no-deps flask requests cryptography websockets psutil blinker paramiko PySocks >> "$LOG_FILE" 2>&1
-            return $?
-        fi
-    fi
+# Step 1: Try minimal installation
+minimal_install() {
+  echo -e "  - Attempting minimal installation..." >> "$LOG_FILE"
+  if ! apt-get update -y >> "$LOG_FILE" 2>&1; then
+    echo -e "${RED}Failed to update package lists. Check $LOG_FILE for details.${NC}"
+    return 1
+  fi
+  if ! apt-get install -y python3 python3-pip curl jq >> "$LOG_FILE" 2>&1; then
+    echo -e "${RED}Failed to install base packages (python3, pip3, curl, jq). Check $LOG_FILE for details.${NC}"
+    return 1
+  fi
+  if ! pip3 install flask requests cryptography websockets psutil blinker paramiko PySocks >> "$LOG_FILE" 2>&1; then
+    echo -e "${RED}Failed to install Python dependencies. Check $LOG_FILE for details.${NC}"
+    return 1
+  fi
+  return 0
 }
 
-# Run installation in the background to show spinner
-install_dependencies &
-bg_pid=$!
-spinner "$bg_pid"
+# Step 2: Robust fallback installation
+robust_install() {
+  echo -e "  - Starting robust fallback..." >> "$LOG_FILE"
+  if ! (apt-get update -y && apt-get upgrade -y) >> "$LOG_FILE" 2>&1; then
+    echo -e "${RED}Failed to update/upgrade system packages in fallback. Check $LOG_FILE.${NC}"
+    return 1
+  fi
+  if ! apt-get install -y python3-pip python3-dev python3-venv build-essential libssl-dev libffi-dev python3-setuptools >> "$LOG_FILE" 2>&1; then
+    echo -e "${RED}Failed to install development packages in fallback. Check $LOG_FILE.${NC}"
+    return 1
+  fi
+  apt-get purge -y python3-blinker >> "$LOG_FILE" 2>&1 || {
+    echo -e "${YELLOW}Warning: Could not purge python3-blinker, continuing anyway...${NC}" | tee -a "$LOG_FILE"
+  }
+  if ! pip3 install --break-system-packages flask requests cryptography websockets psutil blinker paramiko PySocks >> "$LOG_FILE" 2>&1; then
+    echo -e "${RED}Failed to install Python dependencies even with robust fallback. Check $LOG_FILE for details.${NC}"
+    return 1
+  fi
+  return 0
+}
 
-# Wait for the background process and check its exit code
-wait "$bg_pid"
-install_status=$?
-
-if [[ $install_status -eq 0 ]]; then
-    echo -e "  - Successfully installed dependencies."
+# Execute installation with spinner
+if minimal_install; then
+  echo -e "  - Successfully installed dependencies with minimal method."
 else
-    echo -e "\n${YELLOW}Warning: Some dependencies may not have installed correctly.${NC}"
-    echo -e "${YELLOW}Continuing with installation...${NC}"
-    echo -e "${YELLOW}Please check the log file for details: ${CYAN}$LOG_FILE${NC}"
+  echo -e "  - Minimal installation failed, attempting robust fallback..."
+  if robust_install; then
+    echo -e "  - Successfully installed dependencies using robust fallback method."
+  else
+    echo -e "${RED}All installation methods failed. Check $LOG_FILE for details.${NC}"
+    exit 1
+  fi
 fi
+
+echo -e "  - Done installing dependencies."
 
 ###############################################################################
 #                    DETERMINE MARZNESHIN PANEL PORT & PROTOCOL              #
@@ -170,41 +170,33 @@ if [[ -f "$ENV_FILE" ]]; then
   fi
 else
   panel_port="$PANEL_PORT_DEFAULT"
-  echo -e "  - Marzneshin .env file not found. Using default panel port: ${GREEN}$panel_port${NC} and HTTP"
+  echo -e "  - No .env found. Using default panel port: ${GREEN}$panel_port${NC} and HTTP"
 fi
 
 ###############################################################################
 #                     CONFIGURE XARNESHIN FLASK PORT                          #
 ###############################################################################
-echo -e "\n-------- Configuring Xarneshin Port --------"
-echo -e "${BLUE}Choose Xarneshin (this panel) port:${NC}"
+echo -e "\n-------- Configuring Flask port"
+echo -e "${BLUE}Choose Xarneshin Flask port:${NC}"
 echo -e "${GREEN}1${NC}- Set a random port (Recommended)"
 echo -e "${GREEN}2${NC}- Set a custom port"
-
-# Check if we're in a non-interactive mode (piped input)
-if [ -t 0 ]; then
-    read -p "Please enter your choice [1 or 2, default=2]: " choice
-    choice=${choice:-2} # Set default to 2 if empty
-else
-    echo "Non-interactive mode detected, using default choice: 2"
-    choice=2
+read -p "Please enter your choice [1 or 2, default=2]: " choice
+if [[ -z "$choice" ]]; then
+  choice=2
 fi
 
 if [[ "$choice" == "1" ]]; then
   flask_port=$(( (RANDOM % 45535 ) + 20000 ))
   echo -e "  - Using random port: ${GREEN}$flask_port${NC}"
 else
-  if [ -t 0 ]; then
-      read -p "Enter custom Flask port [default: 42689]: " user_port
-      flask_port=${user_port:-42689} # Set default port if empty
-  else
-      flask_port=42689
-      echo "Non-interactive mode: Using default Flask port: $flask_port"
+  read -p "Enter custom Flask port: " user_port
+  if [[ -z "$user_port" ]]; then
+    user_port=42689
   fi
+  flask_port="$user_port"
   echo -e "  - Using custom port: ${GREEN}$flask_port${NC}"
 fi
 
-# Ensure install directory exists (in case it already existed and wasn't created by mv)
 mkdir -p "$INSTALL_DIR"
 
 # Write JSON with panel protocol
@@ -227,7 +219,7 @@ echo -e "\n${CYAN}[Action]${NC} ${GREEN}Creating systemd service: $SERVICE_FILE.
 
 cat << EOF > "$SERVICE_FILE"
 [Unit]
-Description=Xarneshin Flask App by Arash Afkandeh
+Description=Xarneshin Flask App
 After=network.target
 
 [Service]
@@ -236,8 +228,6 @@ WorkingDirectory=$INSTALL_DIR
 ExecStart=/usr/bin/python3 $INSTALL_DIR/xenon.py
 Restart=always
 User=root
-StandardOutput=journal
-StandardError=journal
 
 [Install]
 WantedBy=multi-user.target
@@ -250,13 +240,10 @@ systemctl restart xarneshin.service
 ###############################################################################
 #                        CREATE XARNESHIN CLI TOOL                            #
 ###############################################################################
-echo -e "\n${CYAN}[Action]${NC} ${GREEN}Creating Xarneshin CLI tool...${NC}"
+echo -e "${CYAN}[Action]${NC} ${GREEN}Creating Xarneshin CLI tool...${NC}"
 
 cat << 'EOS' > "$CLI_PATH"
 #!/usr/bin/env bash
-
-# Exit on error
-set -e
 
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -280,8 +267,7 @@ declare -A GEOFILES=(
 )
 
 function get_ipv4() {
-  # Try multiple sources for robustness
-  curl -4 -s ifconfig.me || curl -4 -s api.ipify.org || echo "N/A"
+  curl -4 -s ifconfig.me
 }
 
 function get_uptime() {
@@ -289,8 +275,8 @@ function get_uptime() {
     echo "N/A"
     return
   fi
-  local start_ts=$(systemctl show "$SERVICE" -p ActiveEnterTimestamp --value | sed 's/^\w\+\s*//')
-  if [[ -z "$start_ts" || "$start_ts" == "n/a" ]]; then
+  local start_ts=$(systemctl show "$SERVICE" -p ActiveEnterTimestamp --value)
+  if [[ -z "$start_ts" ]]; then
     echo "N/A"
     return
   fi
@@ -301,15 +287,17 @@ function get_uptime() {
     return
   fi
   local diff=$(( now_sec - start_sec ))
-  local d=$(( diff / 86400 ))
-  local h=$(( (diff % 86400) / 3600 ))
-  local m=$(( (diff % 3600) / 60 ))
-  local s=$(( diff % 60 ))
+  local dd=$(( diff / 86400 ))
+  local rr=$(( diff % 86400 ))
+  local hh=$(( rr / 3600 ))
+  rr=$(( rr % 3600 ))
+  local mm=$(( rr / 60 ))
+  local ss=$(( rr % 60 ))
   local out=""
-  [[ $d -gt 0 ]] && out+="${d}d "
-  [[ $h -gt 0 ]] && out+="${h}h "
-  [[ $m -gt 0 ]] && out+="${m}m "
-  out+="${s}s"
+  if [[ $dd -gt 0 ]]; then out+="${dd}d,"; fi
+  if [[ $hh -gt 0 ]]; then out+="${hh}h,"; fi
+  if [[ $mm -gt 0 ]]; then out+="${mm}m,"; fi
+  out+="${ss}s"
   echo "$out"
 }
 
@@ -377,7 +365,7 @@ function show_access_address() {
     proto="https"
     host="$domain"
   fi
-  if [[ -z "$ip4" || "$ip4" == "N/A" ]]; then
+  if [[ -z "$ip4" ]]; then
     echo -e "${YELLOW}Cannot detect IPv4 automatically.${NC}"
   else
     echo -e "${GREEN}Access URL:${NC} $proto://$host:$flask_port"
@@ -391,7 +379,9 @@ function change_ports_submenu() {
     echo -e "${GREEN}1)${NC} Automatically fetch Marzneshin panel port from .env"
     echo -e "${GREEN}2)${NC} Change Xarneshin Flask port"
     read -p "Choose [0-2, default=2]: " cchoice
-    cchoice=${cchoice:-2}
+    if [[ -z "$cchoice" ]]; then
+      cchoice=2
+    fi
     case "$cchoice" in
       0) return ;;
       1)
@@ -401,7 +391,23 @@ function change_ports_submenu() {
         fi
         local raw_port=$(grep '^UVICORN_PORT' "$ENV_FILE" | sed -E 's/.*UVICORN_PORT[[:space:]]*=[[:space:]]*([0-9]+).*/\1/')
         if [[ "$raw_port" =~ ^[0-9]+$ ]]; then
-          jq --argjson new_port "$raw_port" '.panel_port = $new_port' "$PORTS_FILE" > "${PORTS_FILE}.tmp" && mv "${PORTS_FILE}.tmp" "$PORTS_FILE"
+          local cur_flask_port=$(jq -r '.flask_port' "$PORTS_FILE")
+          local use_https=$(jq -r '.use_https' "$PORTS_FILE")
+          local panel_use_https=$(jq -r '.panel_use_https' "$PORTS_FILE")
+          local domain=$(jq -r '.domain' "$PORTS_FILE")
+          local cert_file=$(jq -r '.cert_file' "$PORTS_FILE")
+          local key_file=$(jq -r '.key_file' "$PORTS_FILE")
+          cat <<EOF > "$PORTS_FILE"
+{
+  "panel_port": $raw_port,
+  "flask_port": $cur_flask_port,
+  "panel_use_https": $panel_use_https,
+  "use_https": $use_https,
+  "domain": "$domain",
+  "cert_file": "$cert_file",
+  "key_file": "$key_file"
+}
+EOF
           echo -e "${GREEN}Updated panel_port to $raw_port${NC}"
           systemctl restart "$SERVICE"
         else
@@ -414,12 +420,13 @@ function change_ports_submenu() {
         echo -e "${GREEN}1)${NC} Random port"
         echo -e "${GREEN}2)${NC} Manual port"
         read -p "Choose [0-2, default=2]: " fchoice
-        fchoice=${fchoice:-2}
-        local new_flask_port
+        if [[ -z "$fchoice" ]]; then
+          fchoice=2
+        fi
         case "$fchoice" in
           0) continue ;;
           1)
-            new_flask_port=$(( (RANDOM % 45535 ) + 20000 ))
+            local new_flask_port=$(( (RANDOM % 45535 ) + 20000 ))
             echo -e "${GREEN}Random Flask port chosen: $new_flask_port${NC}"
             ;;
           2)
@@ -431,7 +438,23 @@ function change_ports_submenu() {
             ;;
           *) echo -e "${RED}Invalid choice.${NC}"; continue ;;
         esac
-        jq --argjson new_port "$new_flask_port" '.flask_port = $new_port' "$PORTS_FILE" > "${PORTS_FILE}.tmp" && mv "${PORTS_FILE}.tmp" "$PORTS_FILE"
+        local cur_panel_port=$(jq -r '.panel_port' "$PORTS_FILE")
+        local use_https=$(jq -r '.use_https' "$PORTS_FILE")
+        local panel_use_https=$(jq -r '.panel_use_https' "$PORTS_FILE")
+        local domain=$(jq -r '.domain' "$PORTS_FILE")
+        local cert_file=$(jq -r '.cert_file' "$PORTS_FILE")
+        local key_file=$(jq -r '.key_file' "$PORTS_FILE")
+        cat <<EOF > "$PORTS_FILE"
+{
+  "panel_port": $cur_panel_port,
+  "flask_port": $new_flask_port,
+  "panel_use_https": $panel_use_https,
+  "use_https": $use_https,
+  "domain": "$domain",
+  "cert_file": "$cert_file",
+  "key_file": "$key_file"
+}
+EOF
         echo -e "${GREEN}Flask port changed to $new_flask_port${NC}"
         echo -e "${GREEN}Restarting Xarneshin...${NC}"
         systemctl restart "$SERVICE"
@@ -449,18 +472,46 @@ function change_panel_protocol() {
     echo -e "${GREEN}1)${NC} Use HTTPS for panel (insecure mode, bypass SSL verification)"
     echo -e "${GREEN}2)${NC} Use HTTP for panel"
     read -p "Choose [0-2, default=2]: " pchoice
-    pchoice=${pchoice:-2}
+    if [[ -z "$pchoice" ]]; then
+      pchoice=2
+    fi
     case "$pchoice" in
       0) return ;;
       1 | 2)
-        local new_https_val=false
-        local msg="Panel protocol set to HTTP"
+        local current_config=$(cat "$PORTS_FILE")
+        local panel_port=$(jq -r '.panel_port' "$PORTS_FILE")
+        local flask_port=$(jq -r '.flask_port' "$PORTS_FILE")
+        local use_https=$(jq -r '.use_https' "$PORTS_FILE")
+        local domain=$(jq -r '.domain' "$PORTS_FILE")
+        local cert_file=$(jq -r '.cert_file' "$PORTS_FILE")
+        local key_file=$(jq -r '.key_file' "$PORTS_FILE")
         if [[ "$pchoice" == "1" ]]; then
-            new_https_val=true
-            msg="Panel protocol set to HTTPS (insecure mode)"
+          cat <<EOF > "$PORTS_FILE"
+{
+  "panel_port": $panel_port,
+  "flask_port": $flask_port,
+  "panel_use_https": true,
+  "use_https": $use_https,
+  "domain": "$domain",
+  "cert_file": "$cert_file",
+  "key_file": "$key_file"
+}
+EOF
+          echo -e "${GREEN}Panel protocol set to HTTPS (insecure mode)${NC}"
+        else
+          cat <<EOF > "$PORTS_FILE"
+{
+  "panel_port": $panel_port,
+  "flask_port": $flask_port,
+  "panel_use_https": false,
+  "use_https": $use_https,
+  "domain": "$domain",
+  "cert_file": "$cert_file",
+  "key_file": "$key_file"
+}
+EOF
+          echo -e "${GREEN}Panel protocol set to HTTP${NC}"
         fi
-        jq --argjson new_val "$new_https_val" '.panel_use_https = $new_val' "$PORTS_FILE" > "${PORTS_FILE}.tmp" && mv "${PORTS_FILE}.tmp" "$PORTS_FILE"
-        echo -e "${GREEN}$msg${NC}"
         systemctl restart "$SERVICE"
         break
         ;;
@@ -476,20 +527,35 @@ function change_https_settings() {
     echo -e "${GREEN}1)${NC} Enable HTTPS"
     echo -e "${GREEN}2)${NC} Disable HTTPS (switch to HTTP)"
     read -p "Choose [0-2, default=2]: " hchoice
-    hchoice=${hchoice:-2}
+    if [[ -z "$hchoice" ]]; then
+      hchoice=2
+    fi
     case "$hchoice" in
       0) return ;;
       1)
-        read -p "Enter domain or IP (e.g., example.com): " domain
+        local current_config=$(cat "$PORTS_FILE")
+        local panel_port=$(jq -r '.panel_port' "$PORTS_FILE")
+        local flask_port=$(jq -r '.flask_port' "$PORTS_FILE")
+        local panel_use_https=$(jq -r '.panel_use_https' "$PORTS_FILE")
+        read -p "Enter domain or IP (e.g., example.com or 192.168.1.100): " domain
         read -p "Enter path to certificate file (e.g., /path/to/cert.pem): " cert_file
         read -p "Enter path to private key file (e.g., /path/to/private.key): " key_file
         if [[ -n "$domain" && -f "$cert_file" && -f "$key_file" ]]; then
-          jq --arg new_domain "$domain" --arg new_cert "$cert_file" --arg new_key "$key_file" \
-             '.use_https = true | .domain = $new_domain | .cert_file = $new_cert | .key_file = $new_key' \
-             "$PORTS_FILE" > "${PORTS_FILE}.tmp" && mv "${PORTS_FILE}.tmp" "$PORTS_FILE"
+          cat <<EOF > "$PORTS_FILE"
+{
+  "panel_port": $panel_port,
+  "flask_port": $flask_port,
+  "panel_use_https": $panel_use_https,
+  "use_https": true,
+  "domain": "$domain",
+  "cert_file": "$cert_file",
+  "key_file": "$key_file"
+}
+EOF
           echo -e "${GREEN}HTTPS enabled with domain: $domain${NC}"
         else
           echo -e "${RED}Invalid input or files not found. No changes made.${NC}"
+          echo "$current_config" > "$PORTS_FILE"
           continue
         fi
         systemctl restart "$SERVICE"
@@ -497,8 +563,21 @@ function change_https_settings() {
         break
         ;;
       2)
-        jq '.use_https = false | .domain = "" | .cert_file = "" | .key_file = ""' \
-           "$PORTS_FILE" > "${PORTS_FILE}.tmp" && mv "${PORTS_FILE}.tmp" "$PORTS_FILE"
+        local current_config=$(cat "$PORTS_FILE")
+        local panel_port=$(jq -r '.panel_port' "$PORTS_FILE")
+        local flask_port=$(jq -r '.flask_port' "$PORTS_FILE")
+        local panel_use_https=$(jq -r '.panel_use_https' "$PORTS_FILE")
+        cat <<EOF > "$PORTS_FILE"
+{
+  "panel_port": $panel_port,
+  "flask_port": $flask_port,
+  "panel_use_https": $panel_use_https,
+  "use_https": false,
+  "domain": "",
+  "cert_file": "",
+  "key_file": ""
+}
+EOF
         echo -e "${GREEN}Switched to HTTP${NC}"
         systemctl restart "$SERVICE"
         show_access_address
@@ -516,7 +595,9 @@ function update_geofiles_cmd() {
     echo -e "${GREEN}1)${NC} Use default directory (/var/lib/marznode)"
     echo -e "${GREEN}2)${NC} Use custom directory"
     read -p "Choose [0-2, default=1]: " gfchoice
-    gfchoice=${gfchoice:-1}
+    if [[ -z "$gfchoice" ]]; then
+      gfchoice=1
+    fi
     case "$gfchoice" in
       0) return ;;
       1 | 2)
@@ -533,11 +614,11 @@ function update_geofiles_cmd() {
           local filename="${GEOFILES[$url]}"
           local dest="$target_directory/$filename"
           echo -e "Downloading ${YELLOW}$url${NC} to ${GREEN}$dest${NC}"
-          if curl -L -s --fail "$url" -o "$dest"; then
+          curl -L -s --fail "$url" -o "$dest" && {
             echo -e "   ${GREEN}Success${NC}"
-          else
+          } || {
             echo -e "   ${RED}Failed to download: $url${NC}"
-          fi
+          }
         done
         echo -e "${GREEN}All geo file downloads completed (where successful).${NC}"
         break
@@ -550,23 +631,22 @@ function update_geofiles_cmd() {
 function restart_cmd() {
   echo -e "${BLUE}Restarting $SERVICE...${NC}"
   systemctl restart "$SERVICE"
-  echo -e "${GREEN}Service restarted.${NC}"
 }
 
 function uninstall_cmd() {
-  echo -ne "${RED}Are you sure you want to uninstall Xarneshin? This is IRREVERSIBLE. (y/N): ${NC}"
+  echo -ne "${RED}Are you sure you want to uninstall Xarneshin? (y/N): ${NC}"
   read answer
   if [[ "$answer" =~ ^[Yy]$ ]]; then
     echo -e "${RED}Uninstalling Xarneshin...${NC}"
-    systemctl stop "$SERVICE" &>/dev/null || true
-    systemctl disable "$SERVICE" &>/dev/null || true
-    rm -f "$SERVICE_FILE"
+    systemctl stop "$SERVICE"
+    systemctl disable "$SERVICE"
+    rm -f /etc/systemd/system/xarneshin.service
     systemctl daemon-reload
-    echo -e "${RED}Removing installation directory $INSTALL_DIR...${NC}"
+    echo -e "${RED}Removing $INSTALL_DIR...${NC}"
     rm -rf "$INSTALL_DIR"
-    echo -e "${RED}Removing CLI tool $CLI_PATH...${NC}"
-    rm -f "$CLI_PATH"
-    echo -e "${GREEN}Uninstallation complete.${NC}"
+    echo -e "${RED}Removing $0...${NC}"
+    rm -f /usr/local/bin/xarneshin
+    echo -e "${GREEN}Done.${NC}"
   else
     echo -e "${YELLOW}Uninstall canceled.${NC}"
   fi
@@ -579,12 +659,12 @@ function menu() {
     echo -e "${GREEN}1)${NC} Show Service detailed status"
     echo -e "${GREEN}2)${NC} Change Ports"
     echo -e "${GREEN}3)${NC} Update Geo Files"
-    echo -e "${GREEN}4)${NC} Restart Xarneshin"
+    echo -e "${GREEN}4)${NC} Restart"
     echo -e "${GREEN}5)${NC} Show Access address"
-    echo -e "${GREEN}6)${NC} Configure Xarneshin HTTPS"
-    echo -e "${GREEN}7)${NC} Configure Marzneshin Panel Protocol"
-    echo -e "${RED}8)${NC} Uninstall"
-    echo -e "${YELLOW}9)${NC} Exit"
+    echo -e "${GREEN}6)${NC} Uninstall"
+    echo -e "${GREEN}7)${NC} Configure HTTPS Settings"
+    echo -e "${GREEN}8)${NC} Configure Panel Protocol"
+    echo -e "${GREEN}9)${NC} Exit"
     read -p "Choose [1-9]: " choice
     case "$choice" in
       1) detail_status ;;
@@ -592,31 +672,30 @@ function menu() {
       3) update_geofiles_cmd ;;
       4) restart_cmd ;;
       5) show_access_address ;;
-      6) change_https_settings ;;
-      7) change_panel_protocol ;;
-      8) uninstall_cmd; break ;;
+      6) uninstall_cmd ; return ;;
+      7) change_https_settings ;;
+      8) change_panel_protocol ;;
       9) echo -e "${GREEN}Bye.${NC}"; break ;;
       *) echo -e "${RED}Invalid choice.${NC}" ;;
     esac
-    echo
   done
 }
 
-# Main execution logic
 if [[ $# -eq 0 ]]; then
   menu
-else
-  case "$1" in
-    status) short_status ;;
-    detail) detail_status ;;
-    change-ports) change_ports_submenu ;;
-    update-geofiles) update_geofiles_cmd ;;
-    restart) restart_cmd ;;
-    show-address) show_access_address ;;
-    uninstall) uninstall_cmd ;;
-    *) echo -e "${YELLOW}Usage: $0 [status|detail|change-ports|update-geofiles|restart|show-address|uninstall]${NC}" >&2; exit 1 ;;
-  esac
+  exit 0
 fi
+
+case "$1" in
+  status) short_status ;;
+  detail) detail_status ;;
+  change-ports) change_ports_submenu ;;
+  update-geofiles) update_geofiles_cmd ;;
+  restart) restart_cmd ;;
+  show-address) show_access_address ;;
+  uninstall) uninstall_cmd ;;
+  *) echo -e "${YELLOW}Usage: xarneshin [status|detail|change-ports|update-geofiles|restart|show-address|uninstall]${NC}" ;;
+esac
 EOS
 
 chmod +x "$CLI_PATH"
@@ -624,18 +703,13 @@ chmod +x "$CLI_PATH"
 ###############################################################################
 #                            FINAL INSTALL REPORT                             #
 ###############################################################################
-ipv4=$(curl -4 -s ifconfig.me || curl -4 -s api.ipify.org || echo "N/A")
-echo -e "\n${CYAN}=====================================================${NC}"
-echo -e "${GREEN}      Xarneshin Installation Complete!${NC}"
-echo -e "${CYAN}=====================================================${NC}\n"
-printf "  ${BLUE}%-20s${NC} %s\n" "Service name:" "xarneshin.service"
-printf "  ${BLUE}%-20s${NC} %s\n" "CLI command:" "xarneshin"
-printf "  ${BLUE}%-20s${NC} %s\n" "Main panel port:" "$panel_port"
-printf "  ${BLUE}%-20s${NC} %s\n" "Xarneshin port:" "$flask_port"
-if [[ "$ipv4" != "N/A" ]]; then
-    printf "  ${BLUE}%-20s${NC} %s\n" "Server IPv4:" "$ipv4"
-    printf "  ${BLUE}%-20s${NC} ${GREEN}http://$ipv4:$flask_port${NC}\n" "Access URL:"
-fi
-echo -e "\n  ${YELLOW}Run 'xarneshin' to manage the service.${NC}"
-echo -e "  ${YELLOW}Note:${NC} For secure access, use '${GREEN}xarneshin${NC}' (option 6) to enable HTTPS."
-echo -e "  ${YELLOW}Installation logs:${NC} $LOG_FILE\n"
+ipv4=$(curl -4 -s ifconfig.me)
+echo -e "\n${CYAN}[Action]${NC} ${GREEN}Installation complete!${NC}  Here’s the summary:\n"
+printf "  ${BLUE}Service name${NC}:    xarneshin.service\n"
+printf "  ${BLUE}CLI command${NC}:     xarneshin\n"
+printf "  ${BLUE}Main panel port${NC}: $panel_port\n"
+printf "  ${BLUE}Flask port${NC}:      $flask_port\n"
+printf "  ${BLUE}Global IPv4${NC}:     $ipv4\n"
+printf "  ${BLUE}Access URL${NC}:      ${GREEN}http://$ipv4:$flask_port${NC}\n"
+echo -e "  ${YELLOW}Note:${NC} For secure access (recommended), enable HTTPS using '${GREEN}xarneshin${NC}' CLI (option 7) with your domain and certificates.\n"
+echo -e "  ${YELLOW}Installation logs:${NC} Check $LOG_FILE if you encountered issues during installation.\n"

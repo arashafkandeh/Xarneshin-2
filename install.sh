@@ -34,8 +34,9 @@ if [ -z "$XARNESHIN_INSTALLER_RUN" ]; then
 
   echo "--- Handing over to the main installer ---"
   # Use exec to replace the current shell process with the new one.
-  # The script will start over, but the XARNESHIN_INSTALLER_RUN var will be set.
-  exec sudo /bin/bash ./install.sh "$@"
+  # The -E flag ensures that our environment variables (like XARNESHIN_INSTALLER_RUN)
+  # are preserved for the new process.
+  exec sudo -E /bin/bash ./install.sh "$@"
 fi
 
 

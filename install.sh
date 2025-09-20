@@ -3,10 +3,9 @@
 ###############################################################################
 #                           Get & Install Packages                            #
 ###############################################################################
-sudo apt install -y wget curl git apt-utils
-sudo pip3 install "sentry-sdk[flask]" paramiko socks requests urllib3 chardet --upgrade
+sudo apt install -y wget curl git apt-utils python3-pip
+sudo pip3 install 'sentry-sdk[flask]' paramiko socks requests urllib3 chardet --upgrade
 
-git clone https://github.com/ArashAfkandeh/Xarneshin-2.git ~/Xenon.xray && cd ~/Xenon.xray && chmod +x install.sh && sudo ./install.sh
 
 ###############################################################################
 #                           ANSI COLOR CONSTANTS                              #
@@ -77,7 +76,36 @@ if [[ -d "$SOURCE_DIR" && ! -d "$INSTALL_DIR" ]]; then
     chmod +x "$INSTALL_DIR/assets/warp.py"
   fi
 elif [[ ! -d "$INSTALL_DIR" ]]; then
-  echo -e "${RED}No directory found at $SOURCE_DIR or $INSTALL_DIR. Exiting.${NC}"
+  echo -e "  - No source directory found. Downloading Xarneshin files..."
+  cd /tmp
+  git clone https://github.com/ArashAfkandeh/Xarneshin-2.git xenon_temp
+  if [[ -d "xenon_temp" ]]; then
+    mv xenon_temp "$INSTALL_DIR"
+    chmod +x "$INSTALL_DIR/assets/xrayc.sh"
+    # Apply dos2unix and chmod +x to .sh files and xenon.py
+    echo -e "  - Applying file corrections (dos2unix, chmod)..."
+    find "$INSTALL_DIR" -type f -name "*.sh" -exec sed -i 's/\r$//' {} \; -exec chmod +x {} \;
+    if [[ -f "$INSTALL_DIR/xenon.py" ]]; then
+      sed -i 's/\r$//' "$INSTALL_DIR/xenon.py"
+      chmod +x "$INSTALL_DIR/xenon.py" # Make executable if it needs to be run directly
+    fi
+    if [[ -f "$INSTALL_DIR/assets/getinfo.py" ]]; then
+      sed -i 's/\r$//' "$INSTALL_DIR/assets/getinfo.py"
+      chmod +x "$INSTALL_DIR/assets/getinfo.py"
+    fi
+    if [[ -f "$INSTALL_DIR/assets/warp.py" ]]; then
+      sed -i 's/\r$//' "$INSTALL_DIR/assets/warp.py"
+      chmod +x "$INSTALL_DIR/assets/warp.py"
+    fi
+  else
+    echo -e "${RED}Failed to download Xarneshin files. Exiting.${NC}"
+    exit 1
+  fi
+fi
+
+# Verify that xenon.py exists
+if [[ ! -f "$INSTALL_DIR/xenon.py" ]]; then
+  echo -e "${RED}Error: xenon.py not found in $INSTALL_DIR. Installation failed.${NC}"
   exit 1
 fi
 
@@ -88,51 +116,55 @@ echo -e "${CYAN}[Action]${NC} ${GREEN}Installing Python and dependencies...${NC}
 echo "Installation logs will be saved to $LOG_FILE"
 
 # Step 1: Try minimal installation
-{
+minimal_install() {
   echo -e "  - Attempting minimal installation..." >> "$LOG_FILE"
-  apt-get update -y >> "$LOG_FILE" 2>&1 || {
+  if ! apt-get update -y >> "$LOG_FILE" 2>&1; then
     echo -e "${RED}Failed to update package lists. Check $LOG_FILE for details.${NC}"
-    exit 1
-  }
-  apt-get install -y python3 python3-pip curl jq >> "$LOG_FILE" 2>&1 || {
-    echo -e "${RED}Failed to install base packages (python3, pip3, curl, jq). Check $LOG_FILE for details.${NC}"
-    exit 1
-  }
-  pip3 install flask requests cryptography websockets psutil blinker paramiko PySocks >> "$LOG_FILE" 2>&1
-} &
-bg_pid=$!
-spinner "$bg_pid"
-wait "$bg_pid"
-
-if [[ $? -ne 0 ]]; then
-  echo -e "  - Minimal installation failed, attempting robust fallback..."
-  # Step 2: Robust fallback
-  {
-    echo -e "  - Starting robust fallback..." >> "$LOG_FILE"
-    apt-get update -y && apt-get upgrade -y >> "$LOG_FILE" 2>&1 || {
-      echo -e "${RED}Failed to update/upgrade system packages in fallback. Check $LOG_FILE.${NC}"
-      exit 1
-    }
-    apt-get install -y python3-pip python3-dev python3-venv build-essential libssl-dev libffi-dev python3-setuptools >> "$LOG_FILE" 2>&1 || {
-      echo -e "${RED}Failed to install development packages in fallback. Check $LOG_FILE.${NC}"
-      exit 1
-    }
-    apt-get purge -y python3-blinker >> "$LOG_FILE" 2>&1 || {
-      echo -e "${YELLOW}Warning: Could not purge python3-blinker, continuing anyway...${NC}" | tee -a "$LOG_FILE"
-    }
-    pip3 install --break-system-packages flask requests cryptography websockets psutil blinker paramiko PySocks >> "$LOG_FILE" 2>&1 || {
-      echo -e "${RED}Failed to install Python dependencies even with robust fallback. Check $LOG_FILE for details.${NC}"
-      exit 1
-    }
-  } &
-  bg_pid=$!
-  spinner "$bg_pid"
-  wait "$bg_pid"
-  if [[ $? -eq 0 ]]; then
-    echo -e "  - Successfully installed dependencies using robust fallback method."
+    return 1
   fi
-else
+  if ! apt-get install -y python3 python3-pip curl jq >> "$LOG_FILE" 2>&1; then
+    echo -e "${RED}Failed to install base packages (python3, pip3, curl, jq). Check $LOG_FILE for details.${NC}"
+    return 1
+  fi
+  if ! pip3 install flask requests cryptography websockets psutil blinker paramiko PySocks >> "$LOG_FILE" 2>&1; then
+    echo -e "${RED}Failed to install Python dependencies. Check $LOG_FILE for details.${NC}"
+    return 1
+  fi
+  return 0
+}
+
+# Step 2: Robust fallback installation
+robust_install() {
+  echo -e "  - Starting robust fallback..." >> "$LOG_FILE"
+  if ! (apt-get update -y && apt-get upgrade -y) >> "$LOG_FILE" 2>&1; then
+    echo -e "${RED}Failed to update/upgrade system packages in fallback. Check $LOG_FILE.${NC}"
+    return 1
+  fi
+  if ! apt-get install -y python3-pip python3-dev python3-venv build-essential libssl-dev libffi-dev python3-setuptools >> "$LOG_FILE" 2>&1; then
+    echo -e "${RED}Failed to install development packages in fallback. Check $LOG_FILE.${NC}"
+    return 1
+  fi
+  apt-get purge -y python3-blinker >> "$LOG_FILE" 2>&1 || {
+    echo -e "${YELLOW}Warning: Could not purge python3-blinker, continuing anyway...${NC}" | tee -a "$LOG_FILE"
+  }
+  if ! pip3 install --break-system-packages flask requests cryptography websockets psutil blinker paramiko PySocks >> "$LOG_FILE" 2>&1; then
+    echo -e "${RED}Failed to install Python dependencies even with robust fallback. Check $LOG_FILE for details.${NC}"
+    return 1
+  fi
+  return 0
+}
+
+# Execute installation with spinner
+if minimal_install; then
   echo -e "  - Successfully installed dependencies with minimal method."
+else
+  echo -e "  - Minimal installation failed, attempting robust fallback..."
+  if robust_install; then
+    echo -e "  - Successfully installed dependencies using robust fallback method."
+  else
+    echo -e "${RED}All installation methods failed. Check $LOG_FILE for details.${NC}"
+    exit 1
+  fi
 fi
 
 echo -e "  - Done installing dependencies."

@@ -727,6 +727,8 @@ EOS
 
 chmod +x "$CLI_PATH"
 
+sudo find /opt/Xenon.xray/assets /opt/Xenon.xray/modules -type f \( -name "*.sh" -o -name "*.py" \) -exec chmod +x {} \;
+
 ###############################################################################
 #                            FINAL INSTALL REPORT                             #
 ###############################################################################

@@ -207,7 +207,7 @@ echo -e "\n-------- Configuring Flask port"
 echo -e "${BLUE}Choose Xarneshin Flask port:${NC}"
 echo -e "${GREEN}1${NC}- Set a random port (Recommended)"
 echo -e "${GREEN}2${NC}- Set a custom port"
-read -p "Please enter your choice [1 or 2, default=2]: " choice
+read -p "Please enter your choice [1 or 2, default=2]: " choice < /dev/tty
 if [[ -z "$choice" ]]; then
   choice=2
 fi
@@ -216,7 +216,7 @@ if [[ "$choice" == "1" ]]; then
   flask_port=$(( (RANDOM % 45535 ) + 20000 ))
   echo -e "  - Using random port: ${GREEN}$flask_port${NC}"
 else
-  read -p "Enter custom Flask port: " user_port
+  read -p "Enter custom Flask port: " user_port < /dev/tty
   if [[ -z "$user_port" ]]; then
     user_port=42689
   fi
@@ -404,7 +404,7 @@ function change_ports_submenu() {
     echo -e "${GREEN}0)${NC} Back"
     echo -e "${GREEN}1)${NC} Automatically fetch Marzneshin panel port from .env"
     echo -e "${GREEN}2)${NC} Change Xarneshin Flask port"
-    read -p "Choose [0-2, default=2]: " cchoice
+    read -p "Choose [0-2, default=2]: " cchoice < /dev/tty
     if [[ -z "$cchoice" ]]; then
       cchoice=2
     fi
@@ -445,7 +445,7 @@ EOF
         echo -e "${GREEN}0)${NC} Back"
         echo -e "${GREEN}1)${NC} Random port"
         echo -e "${GREEN}2)${NC} Manual port"
-        read -p "Choose [0-2, default=2]: " fchoice
+        read -p "Choose [0-2, default=2]: " fchoice < /dev/tty
         if [[ -z "$fchoice" ]]; then
           fchoice=2
         fi
@@ -456,7 +456,7 @@ EOF
             echo -e "${GREEN}Random Flask port chosen: $new_flask_port${NC}"
             ;;
           2)
-            read -p "Enter Flask port: " new_flask_port
+            read -p "Enter Flask port: " new_flask_port < /dev/tty
             if [[ ! "$new_flask_port" =~ ^[0-9]+$ ]]; then
               echo -e "${RED}Invalid numeric input.${NC}"
               continue
@@ -497,7 +497,7 @@ function change_panel_protocol() {
     echo -e "${GREEN}0)${NC} Back"
     echo -e "${GREEN}1)${NC} Use HTTPS for panel (insecure mode, bypass SSL verification)"
     echo -e "${GREEN}2)${NC} Use HTTP for panel"
-    read -p "Choose [0-2, default=2]: " pchoice
+    read -p "Choose [0-2, default=2]: " pchoice < /dev/tty
     if [[ -z "$pchoice" ]]; then
       pchoice=2
     fi
@@ -552,7 +552,7 @@ function change_https_settings() {
     echo -e "${GREEN}0)${NC} Back"
     echo -e "${GREEN}1)${NC} Enable HTTPS"
     echo -e "${GREEN}2)${NC} Disable HTTPS (switch to HTTP)"
-    read -p "Choose [0-2, default=2]: " hchoice
+    read -p "Choose [0-2, default=2]: " hchoice < /dev/tty
     if [[ -z "$hchoice" ]]; then
       hchoice=2
     fi
@@ -563,9 +563,9 @@ function change_https_settings() {
         local panel_port=$(jq -r '.panel_port' "$PORTS_FILE")
         local flask_port=$(jq -r '.flask_port' "$PORTS_FILE")
         local panel_use_https=$(jq -r '.panel_use_https' "$PORTS_FILE")
-        read -p "Enter domain or IP (e.g., example.com or 192.168.1.100): " domain
-        read -p "Enter path to certificate file (e.g., /path/to/cert.pem): " cert_file
-        read -p "Enter path to private key file (e.g., /path/to/private.key): " key_file
+        read -p "Enter domain or IP (e.g., example.com or 192.168.1.100): " domain < /dev/tty
+        read -p "Enter path to certificate file (e.g., /path/to/cert.pem): " cert_file < /dev/tty
+        read -p "Enter path to private key file (e.g., /path/to/private.key): " key_file < /dev/tty
         if [[ -n "$domain" && -f "$cert_file" && -f "$key_file" ]]; then
           cat <<EOF > "$PORTS_FILE"
 {
@@ -620,7 +620,7 @@ function update_geofiles_cmd() {
     echo -e "${GREEN}0)${NC} Back"
     echo -e "${GREEN}1)${NC} Use default directory (/var/lib/marznode)"
     echo -e "${GREEN}2)${NC} Use custom directory"
-    read -p "Choose [0-2, default=1]: " gfchoice
+    read -p "Choose [0-2, default=1]: " gfchoice < /dev/tty
     if [[ -z "$gfchoice" ]]; then
       gfchoice=1
     fi
@@ -629,7 +629,7 @@ function update_geofiles_cmd() {
       1 | 2)
         local target_directory="/var/lib/marznode"
         if [[ "$gfchoice" == "2" ]]; then
-          read -p "Enter custom directory path: " custom_dir
+          read -p "Enter custom directory path: " custom_dir < /dev/tty
           if [[ -n "$custom_dir" ]]; then
             target_directory="$custom_dir"
           fi
@@ -661,7 +661,7 @@ function restart_cmd() {
 
 function uninstall_cmd() {
   echo -ne "${RED}Are you sure you want to uninstall Xarneshin? (y/N): ${NC}"
-  read answer
+  read answer < /dev/tty
   if [[ "$answer" =~ ^[Yy]$ ]]; then
     echo -e "${RED}Uninstalling Xarneshin...${NC}"
     systemctl stop "$SERVICE"
@@ -691,7 +691,7 @@ function menu() {
     echo -e "${GREEN}7)${NC} Configure HTTPS Settings"
     echo -e "${GREEN}8)${NC} Configure Panel Protocol"
     echo -e "${GREEN}9)${NC} Exit"
-    read -p "Choose [1-9]: " choice
+    read -p "Choose [1-9]: " choice < /dev/tty
     case "$choice" in
       1) detail_status ;;
       2) change_ports_submenu ;;
@@ -722,6 +722,8 @@ case "$1" in
   uninstall) uninstall_cmd ;;
   *) echo -e "${YELLOW}Usage: xarneshin [status|detail|change-ports|update-geofiles|restart|show-address|uninstall]${NC}" ;;
 esac
+
+EOS
 
 chmod +x "$CLI_PATH"
 

@@ -84,24 +84,45 @@ echo "Installation logs are being saved to $LOG_FILE"
 install_dependencies() {
     echo "--- Starting Dependency Installation ---" >> "$LOG_FILE"
     
-    # Step 1: Try minimal installation
-    echo "Attempting minimal installation..." >> "$LOG_FILE"
+    # Step 1: Update package lists
+    echo "Updating package lists..." >> "$LOG_FILE"
     apt-get update -y >> "$LOG_FILE" 2>&1
-    apt-get install -y python3 python3-pip curl jq >> "$LOG_FILE" 2>&1
-    pip3 install flask requests cryptography websockets psutil blinker paramiko PySocks >> "$LOG_FILE" 2>&1
     
-    local pip_status=$?
-    if [[ $pip_status -ne 0 ]]; then
-        echo "Minimal installation failed with pip status $pip_status. Attempting robust fallback..." >> "$LOG_FILE"
-        # Step 2: Robust fallback
-        apt-get install -y python3-dev python3-venv build-essential libssl-dev libffi-dev python3-setuptools >> "$LOG_FILE" 2>&1
-        apt-get purge -y python3-blinker >> "$LOG_FILE" 2>&1 || echo "Warning: Could not purge python3-blinker, continuing..." >> "$LOG_FILE"
+    # Step 2: Install packages with automatic yes to prompts
+    echo "Installing system packages..." >> "$LOG_FILE"
+    apt-get install -y --no-install-recommends python3 python3-pip curl jq >> "$LOG_FILE" 2>&1
+    
+    # Step 3: Upgrade pip first
+    echo "Upgrading pip..." >> "$LOG_FILE"
+    python3 -m pip install --upgrade pip >> "$LOG_FILE" 2>&1 || true
+    
+    # Step 4: Install Python packages
+    echo "Installing Python packages..." >> "$LOG_FILE"
+    
+    # Try regular installation first
+    if python3 -m pip install flask requests cryptography websockets psutil blinker paramiko PySocks >> "$LOG_FILE" 2>&1; then
+        echo "Python packages installed successfully" >> "$LOG_FILE"
+        return 0
+    else
+        echo "Regular pip installation failed, trying with --break-system-packages..." >> "$LOG_FILE"
         
-        # Use --break-system-packages for newer Debian/Ubuntu versions
-        pip3 install --break-system-packages flask requests cryptography websockets psutil blinker paramiko PySocks >> "$LOG_FILE" 2>&1
-        return $?
+        # Install additional dependencies for compilation
+        apt-get install -y --no-install-recommends python3-dev python3-venv build-essential libssl-dev libffi-dev python3-setuptools >> "$LOG_FILE" 2>&1
+        
+        # Remove conflicting package if exists
+        apt-get purge -y python3-blinker >> "$LOG_FILE" 2>&1 || true
+        
+        # Try with --break-system-packages flag (for newer systems)
+        if python3 -m pip install --break-system-packages flask requests cryptography websockets psutil blinker paramiko PySocks >> "$LOG_FILE" 2>&1; then
+            echo "Python packages installed with --break-system-packages" >> "$LOG_FILE"
+            return 0
+        else
+            # Last resort: force installation
+            echo "Trying force installation..." >> "$LOG_FILE"
+            python3 -m pip install --force-reinstall --no-deps flask requests cryptography websockets psutil blinker paramiko PySocks >> "$LOG_FILE" 2>&1
+            return $?
+        fi
     fi
-    return 0
 }
 
 # Run installation in the background to show spinner
@@ -116,9 +137,9 @@ install_status=$?
 if [[ $install_status -eq 0 ]]; then
     echo -e "  - Successfully installed dependencies."
 else
-    echo -e "\n${RED}ERROR: Failed to install Python dependencies.${NC}"
-    echo -e "${RED}Please check the log file for details: ${YELLOW}$LOG_FILE${NC}"
-    exit 1
+    echo -e "\n${YELLOW}Warning: Some dependencies may not have installed correctly.${NC}"
+    echo -e "${YELLOW}Continuing with installation...${NC}"
+    echo -e "${YELLOW}Please check the log file for details: ${CYAN}$LOG_FILE${NC}"
 fi
 
 ###############################################################################
@@ -159,15 +180,27 @@ echo -e "\n-------- Configuring Xarneshin Port --------"
 echo -e "${BLUE}Choose Xarneshin (this panel) port:${NC}"
 echo -e "${GREEN}1${NC}- Set a random port (Recommended)"
 echo -e "${GREEN}2${NC}- Set a custom port"
-read -p "Please enter your choice [1 or 2, default=2]: " choice
-choice=${choice:-2} # Set default to 2 if empty
+
+# Check if we're in a non-interactive mode (piped input)
+if [ -t 0 ]; then
+    read -p "Please enter your choice [1 or 2, default=2]: " choice
+    choice=${choice:-2} # Set default to 2 if empty
+else
+    echo "Non-interactive mode detected, using default choice: 2"
+    choice=2
+fi
 
 if [[ "$choice" == "1" ]]; then
   flask_port=$(( (RANDOM % 45535 ) + 20000 ))
   echo -e "  - Using random port: ${GREEN}$flask_port${NC}"
 else
-  read -p "Enter custom Flask port [default: 42689]: " user_port
-  flask_port=${user_port:-42689} # Set default port if empty
+  if [ -t 0 ]; then
+      read -p "Enter custom Flask port [default: 42689]: " user_port
+      flask_port=${user_port:-42689} # Set default port if empty
+  else
+      flask_port=42689
+      echo "Non-interactive mode: Using default Flask port: $flask_port"
+  fi
   echo -e "  - Using custom port: ${GREEN}$flask_port${NC}"
 fi
 

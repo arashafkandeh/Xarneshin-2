@@ -1,0 +1,781 @@
+<!-- templates/nodes.html -->
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Xarzneshin Core Manager - Nodes</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+      body {
+        background: linear-gradient(135deg, #0d1b2a, #1b263b);
+        font-family: 'Inter', sans-serif;
+        overflow-x: hidden;
+      }
+      .glass-effect {
+        background: rgba(27, 38, 59, 0.7);
+        backdrop-filter: blur(10px);
+        border: 1px solid rgba(167, 139, 250, 0.3);
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+      }
+      .neon-hover {
+        transition: box-shadow 0.3s ease, background-color 0.3s ease;
+      }
+      .neon-hover:hover {
+        box-shadow: 0 0 15px rgba(167, 139, 250, 0.7);
+      }
+      @keyframes slideDownUp {
+        0% { top: -50px; opacity: 0; }
+        20% { top: 20px; opacity: 1; }
+        80% { top: 20px; opacity: 1; }
+        100% { top: -50px; opacity: 0; }
+      }
+      .notification {
+        position: fixed;
+        left: 50%;
+        transform: translateX(-50%);
+        background: linear-gradient(45deg, #facc15, #fbbf24);
+        color: #1e293b;
+        padding: 0.75rem 1.5rem;
+        border-radius: 0.75rem;
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+        z-index: 50;
+        animation: slideDownUp 5s forwards;
+        font-weight: 500;
+        letter-spacing: 0.5px;
+        max-width: 90%;
+        text-align: center;
+      }
+      ::-webkit-scrollbar {
+        width: 8px;
+      }
+      @media (min-width: 640px) {
+        ::-webkit-scrollbar {
+          width: 6px;
+        }
+        .table-wrapper {
+          max-height: calc(100vh - 200px);
+          overflow-y: auto;
+          overflow-x: auto;
+        }
+      }
+      ::-webkit-scrollbar-track {
+        background: #1b263b;
+      }
+      ::-webkit-scrollbar-thumb {
+        background: #a78bfa;
+        border-radius: 4px;
+      }
+      ::-webkit-scrollbar-thumb:hover {
+        background: #c4b5fd;
+      }
+      input[type="radio"] {
+        appearance: none;
+        width: 16px;
+        height: 16px;
+        border: 2px solid #a78bfa;
+        border-radius: 50%;
+        background-color: transparent;
+        cursor: pointer;
+      }
+      input[type="radio"]:checked {
+        background-color: #3b82f6;
+        border-color: #3b82f6;
+        box-shadow: inset 0 0 0 3px rgba(27, 38, 59, 0.7);
+      }
+      @keyframes pulse {
+        0%, 100% {
+          transform: scale(1.1);
+          opacity: 1;
+        }
+        50% {
+          transform: scale(1.4);
+          opacity: 2;
+        }
+      }
+      .status-dot {
+        display: inline-block;
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        margin-left: 8px; /* ml-2 in Tailwind */
+        vertical-align: middle;
+      }
+      .status-dot-running {
+        background-color: #4ade80; /* green-400 */
+        box-shadow: 0 0 5px #4ade80;
+        animation: pulse 2s infinite cubic-bezier(0.4, 0, 0.6, 1);
+      }
+      .status-dot-stopped {
+        background-color: #f87171; /* red-400 */
+        box-shadow: 0 0 5px #f87171;
+      }
+      @keyframes pulse-orange {
+        0%, 100% {
+          transform: scale(1);
+          filter: drop-shadow(0 0 4px #fdba74); /* orange-300 */
+        }
+        50% {
+          transform: scale(1.1);
+          filter: drop-shadow(0 0 10px #f97316); /* orange-500 */
+        }
+      }
+      .tunnel-active-icon {
+        animation: pulse-orange 2s infinite cubic-bezier(0.4, 0, 0.6, 1);
+      }
+      .tunnel-inactive-icon {
+        filter: drop-shadow(0 0 3px #ef4444); /* red-500 */
+      }
+      .vertical-separator {
+        width: 2px; /* کمی ضخیم‌تر */
+        background: linear-gradient(to bottom, 
+          rgba(167, 139, 250, 0),      /* شروع شفاف */
+          rgba(167, 139, 250, 0.8) 50%, /* مرکز درخشان بنفش */
+          rgba(167, 139, 250, 0)       /* انتهای شفاف */
+        );
+        box-shadow: 0 0 7px rgba(167, 139, 250, 0.5); /* افکت درخشش */
+        border-radius: 2px; /* نرم کردن لبه‌ها */
+      }
+    </style>
+  </head>
+  <body class="text-gray-100">
+    <!-- Header -->
+    <header class="bg-gradient-to-r from-indigo-900 to-cyan-900 shadow-md">
+      <div class="max-w-7xl mx-auto px-4 sm:px-6 py-4 flex flex-col sm:flex-row items-center justify-between">
+        <div class="flex flex-col text-center sm:text-left">
+          <span class="text-white text-xl sm:text-2xl font-bold text-cyan-400">Xarzneshin Core Manager</span>
+          <span class="text-gray-300 text-xs sm:text-sm">Xenon Marzneshin Core Manager</span>
+        </div>
+        <div class="flex flex-col sm:flex-row items-center space-y-2 sm:space-y-0 sm:space-x-4 mt-3 sm:mt-0">
+          <div class="relative">
+            <button id="supportToggle" class="inline-flex items-center justify-center bg-green-600 hover:bg-green-700 text-white text-sm sm:text-base font-semibold px-3 sm:px-4 py-2 rounded-lg transition-colors neon-hover">
+              Support Us
+            </button>
+            <div id="supportDropdown" class="absolute right-0 mt-2 w-56 glass-effect rounded-lg shadow-lg hidden z-50">
+              <div class="py-2">
+                <a href="https://t.me/xenonNet" target="_blank" class="flex items-center px-4 py-2 text-sm text-gray-200 hover:bg-gray-700/70 neon-hover">
+                  <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 sm:h-8 sm:w-8 mr-2" viewBox="0 0 255.99908 255.99908">
+                    <g fill="#a5b4fc" fill-rule="nonzero">
+                      <g transform="scale(5.12,5.12)">
+                        <path d="M25,2c-12.69071,0 -23,10.3093 -23,23c0,12.6907 10.30929,23 23,23c12.69071,0 23,-10.3093 23,-23c0,-12.6907 -10.30929,-23 -23,-23zM25,4c11.60983,0 21,9.39017 21,21c0,11.60983 -9.39017,21 -21,21c-11.60983,0 -21,-9.39017 -21,-21c0,-11.60982 9.39017,-21 21,-21zM34.08789,14.03516c-0.684,0 -1.45256,0.15842 -2.35156,0.48242c-1.396,0.503 -17.81559,7.47458 -19.68359,8.26758c-1.068,0.454 -3.05664,1.2985 -3.05664,3.3125c0,1.335 0.78227,2.28984 2.32227,2.83984c0.828,0.295 2.79455,0.89108 3.93555,1.20508c0.484,0.133 0.99834,0.20117 1.52734,0.20117c1.035,0 2.07658,-0.25789 2.89258,-0.71289c-0.007,0.168 -0.00242,0.33781 0.01758,0.50781c0.123,1.05 0.77047,2.03758 1.73047,2.64258c0.628,0.396 5.75744,3.83291 6.52344,4.37891c1.076,0.769 2.2655,1.17578 3.4375,1.17578c2.24,0 2.99152,-2.31283 3.35352,-3.42383c0.525,-1.613 2.49089,-14.72997 2.71289,-17.04297c0.151,-1.585 -0.50958,-2.89019 -1.76758,-3.49219c-0.471,-0.227 -1.00875,-0.3418 -1.59375,-0.3418zM34.08789,16.03516c0.275,0 0.52052,0.04548 0.72852,0.14648c0.473,0.227 0.71363,0.73305 0.64063,1.49805c-0.242,2.523 -2.20309,15.32928 -2.62109,16.61328c-0.358,1.098 -0.73512,2.04297 -1.45313,2.04297c-0.718,0 -1.50239,-0.25169 -2.27539,-0.80469c-0.773,-0.552 -5.90614,-3.99436 -6.61914,-4.44336c-0.625,-0.394 -1.28647,-1.37617 -0.35547,-2.32617c0.767,-0.782 6.58503,-6.42878 7.08203,-6.92578c0.37,-0.371 0.19698,-0.81836 -0.16602,-0.81836c-0.125,0 -0.27469,0.05269 -0.42969,0.17969c-0.608,0.497 -9.08436,6.169 -9.81836,6.625c-0.486,0.302 -1.23853,0.51953 -2.01953,0.51953c-0.333,0 -0.67014,-0.03991 -0.99414,-0.12891c-1.128,-0.311 -3.03692,-0.89016 -3.79492,-1.16016c-0.729,-0.26 -0.99414,-0.50908 -0.99414,-0.95508c0,-0.634 0.89489,-1.07166 1.83789,-1.47266c0.996,-0.423 18.23012,-7.74156 19.57812,-8.22656c0.624,-0.226 1.19483,-0.36328 1.67383,-0.36328z"></path>
+                      </g>
+                    </g>
+                  </svg>
+                  Join Telegram
+                </a>
+                <a href="https://github.com/MeXenon" target="_blank" class="flex items-center px-4 py-2 text-sm text-gray-200 hover:bg-gray-700/70 neon-hover">
+                  <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 sm:h-8 sm:w-8 mr-2" fill="#a5b4fc" viewBox="0 0 24 24">
+                    <path d="M12 0C5.371 0 0 5.373 0 12a12 12 0 008.205 11.386c.6.111.82-.261.82-.58 0-.287-.011-1.244-.016-2.253-3.338.724-4.042-1.61-4.042-1.61-.546-1.386-1.333-1.754-1.333-1.754-1.089-.745.083-.73.083-.73 1.205.085 1.84 1.238 1.84 1.238 1.07 1.833 2.809 1.304 3.495.997.107-.775.418-1.305.762-1.605-2.665-.305-5.466-1.333-5.466-5.93 0-1.31.469-2.382 1.236-3.221-.124-.304-.536-1.524.117-3.176 0 0 1.008-.322 3.301 1.23a11.52 11.52 0 016.003 0c2.292-1.553 3.298-1.23 3.298-1.23.654 1.653.242 2.873.119 3.176.77.839 1.235 1.911 1.235 3.221 0 4.61-2.804 5.622-5.475 5.921.43.37.814 1.103.814 2.222 0 1.606-.015 2.898-.015 3.293 0 .322.218.697.825.579A12.005 12.005 0 0024 12c0-6.627-5.373-12-12-12z"/>
+                  </svg>
+                  GitHub
+                </a>
+              </div>
+            </div>
+            <a href="/logout" class="inline-flex items-center justify-center bg-red-600 hover:bg-red-700 text-white text-sm sm:text-base font-semibold px-3 sm:px-4 py-2 rounded-lg transition-colors neon-hover">
+              Logout
+            </a>
+          </div>
+        </div>
+      </header>
+
+      <!-- Main Content -->
+      <main class="max-w-7xl mx-auto my-6 sm:my-8 px-4 sm:px-6">
+        {% with messages = get_flashed_messages() %}
+          {% if messages %}
+            <div class="mb-4 sm:mb-6 p-3 sm:p-4 bg-yellow-500/20 border border-yellow-400/50 rounded-lg text-yellow-300 text-sm">
+              {% for msg in messages %}
+                <div>{{ msg }}</div>
+              {% endfor %}
+            </div>
+          {% endif %}
+        {% endwith %}
+        <div class="flex justify-between items-center mb-4 sm:mb-6">
+          <h2 class="text-xl sm:text-2xl md:text-3xl font-bold text-cyan-400">All Nodes</h2>
+          <div class="flex space-x-2">
+            <button onclick="openAddNodeModal()"
+                    class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded text-sm transition-colors neon-hover">
+              Add Node
+            </button>
+            <button id="restartAllNodesCoresBtn" onclick="showRestartAllConfirm()"
+                    class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded text-sm transition-colors neon-hover">
+              Restart All Xray Cores
+            </button>
+          </div>
+        </div>
+
+        <!-- Desktop Fixed-Column Grid View -->
+        <div class="hidden sm:grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+          {% for item in nodes["items"] %}
+            <div class="glass-effect rounded-lg shadow-xl p-4 flex flex-col">
+              <!-- Card Header -->
+              <div class="flex justify-between items-center mb-4 border-b border-gray-700/50 pb-4">
+                <span class="font-bold text-lg text-gray-200 truncate pr-2">{{ item["id"] }} - {{ item["name"] }}</span>
+                {% if item["status"] == "healthy" %}
+                  <span class="bg-green-600/80 text-white px-2 py-1 rounded-full text-xs whitespace-nowrap">Healthy</span>
+                {% else %}
+                  <span class="bg-red-600/80 text-white px-2 py-1 rounded-full text-xs whitespace-nowrap">{{ item["status"] }}</span>
+                {% endif %}
+              </div>
+        
+              <!-- Main Content (takes remaining space) -->
+              <div class="flex-grow">
+                <!-- Row for Titles -->
+                <div class="flex space-x-4 mb-3">
+                  <div class="w-1/2 text-center">
+                    <h4 class="font-semibold text-cyan-400">Core</h4>
+                  </div>
+                  <!-- Vertical Separator -->
+                  <div class="vertical-separator"></div>
+                  <div class="w-1/2 text-center">
+                    <h4 class="font-semibold text-cyan-400">Tunnel</h4>
+                  </div>
+                </div>
+          
+                <!-- Row for Statuses (horizontal border removed) -->
+                <div class="flex space-x-4 py-3">
+                  <!-- Core Status -->
+                  <div class="w-1/2 text-center space-y-2">
+                    {% for backend in item["backends"] %}
+                      <div>
+                        <div class="flex items-center justify-center">
+                          <span class="text-gray-200">{{ backend["name"] | capitalize }}</span>
+                          <span class="status-dot {% if backend['running'] %}status-dot-running{% else %}status-dot-stopped{% endif %}"></span>
+                        </div>
+                        <span class="block text-xs text-gray-400 mt-1">v{{ backend["version"] or '---' }}</span>
+                      </div>
+                    {% endfor %}
+                  </div>
+                  <!-- Vertical Separator -->
+                  <div class="vertical-separator"></div>
+                  <!-- Tunnel Status (vertically centered) -->
+                  <div class="w-1/2 text-center flex items-center justify-center">
+                    {% if item.name == 'local' %}
+                      <img src="{{ url_for('static', filename='active_tunnel.png') }}" alt="Active Tunnel" class="h-8 w-auto tunnel-active-icon">
+                    {% else %}
+                      <img src="{{ url_for('static', filename='inactive_tunnel.png') }}" alt="Inactive Tunnel" class="h-8 w-auto tunnel-inactive-icon">
+                    {% endif %}
+                  </div>
+                </div>
+              </div>
+
+              <!-- Row for Actions (always at the bottom) -->
+              <div class="flex space-x-4 pt-3 mt-auto">
+                <!-- Core Actions -->
+                <div class="w-1/2 flex flex-col gap-1.5">
+                  {% if item["backends"]|selectattr("name", "equalto", "xray")|selectattr("running", "equalto", true)|list|length > 0 %}
+                    <!-- Button color changed to Cyan -->
+                    <a href="{{ url_for('overview.overview', node_id=item['id']) }}" class="bg-cyan-500 hover:bg-cyan-600 text-slate-900 font-semibold px-3 py-1.5 rounded text-sm transition-colors neon-hover w-full text-center">
+                      Manage
+                    </a>
+                  {% endif %}
+                  {% if item["name"] == "local" %}
+                    <button id="changeCoreBtn-desktop-{{ item['id'] }}" onclick="openChangeCoreModal({{ item['id'] }})" class="bg-purple-600 hover:bg-purple-700 text-white px-3 py-1.5 rounded text-sm transition-colors neon-hover w-full">
+                      Change Core
+                    </button>
+                  {% endif %}
+                  {% if item["backends"]|selectattr("name", "equalto", "xray")|list|length > 0 %}
+                    <button onclick="showRestartConfirm({{ item['id'] }})" class="bg-fuchsia-700 hover:bg-fuchsia-800 text-white px-3 py-1.5 rounded text-sm transition-colors neon-hover w-full">
+                      Restart
+                    </button>
+                  {% endif %}
+                </div>
+                <!-- Vertical Separator -->
+                <div class="vertical-separator"></div>
+                <!-- Tunnel Actions -->
+                <div class="w-1/2 flex flex-col gap-1.5">
+                   {% if item.name == 'local' %}
+                     <button onclick="alert('Manage Tunnel for Node {{ item.id }}')" class="bg-teal-600 hover:bg-teal-700 text-white px-3 py-1.5 rounded text-sm transition-colors neon-hover w-full text-center">Manage Tunnel</button>
+                     <button onclick="alert('Restart Tunnel for Node {{ item.id }}')" class="bg-sky-600 hover:bg-sky-700 text-white px-3 py-1.5 rounded text-sm transition-colors neon-hover w-full text-center">Restart Tunnel</button>
+                   {% else %}
+                      <button onclick="alert('Setup Tunnel for Node {{ item.id }}')" class="bg-gray-500 hover:bg-gray-600 text-white px-3 py-1.5 rounded text-sm transition-colors neon-hover w-full text-center">Setup</button>
+                   {% endif %}
+                </div>
+              </div>
+            </div>
+          {% endfor %}
+        </div>
+
+        <!-- Mobile Card View -->
+        <div class="block sm:hidden space-y-4">
+          {% for item in nodes["items"] %}
+            <div class="glass-effect rounded-lg shadow-xl p-4">
+              <!-- Card Header -->
+              <div class="flex justify-between items-center mb-4 border-b border-gray-700/50 pb-4">
+                <span class="font-bold text-lg text-gray-200 truncate pr-2">{{ item["id"] }} - {{ item["name"] }}</span>
+                {% if item["status"] == "healthy" %}
+                  <span class="bg-green-600/80 text-white px-2 py-1 rounded-full text-xs whitespace-nowrap">Healthy</span>
+                {% else %}
+                  <span class="bg-red-600/80 text-white px-2 py-1 rounded-full text-xs whitespace-nowrap">{{ item["status"] }}</span>
+                {% endif %}
+              </div>
+        
+              <!-- Row for Titles -->
+              <div class="flex space-x-4 mb-3">
+                <div class="w-1/2 text-center">
+                  <h4 class="font-semibold text-cyan-400">Core</h4>
+                </div>
+                <!-- Vertical Separator -->
+                <div class="vertical-separator"></div>
+                <div class="w-1/2 text-center">
+                  <h4 class="font-semibold text-cyan-400">Tunnel</h4>
+                </div>
+              </div>
+        
+              <!-- Row for Statuses (horizontal border removed) -->
+              <div class="flex space-x-4 py-3">
+                <!-- Core Status -->
+                <div class="w-1/2 text-center space-y-2">
+                  {% for backend in item["backends"] %}
+                    <div>
+                      <div class="flex items-center justify-center">
+                        <span class="text-gray-200">{{ backend["name"] | capitalize }}</span>
+                        <span class="status-dot {% if backend['running'] %}status-dot-running{% else %}status-dot-stopped{% endif %}"></span>
+                      </div>
+                      <span class="block text-xs text-gray-400 mt-1">v{{ backend["version"] or '---' }}</span>
+                    </div>
+                  {% endfor %}
+                </div>
+                <!-- Vertical Separator -->
+                <div class="vertical-separator"></div>
+                <!-- Tunnel Status (vertically centered) -->
+                <div class="w-1/2 text-center flex items-center justify-center">
+                  {% if item.name == 'local' %}
+                    <img src="{{ url_for('static', filename='active_tunnel.png') }}" alt="Active Tunnel" class="h-8 w-auto tunnel-active-icon">
+                  {% else %}
+                    <img src="{{ url_for('static', filename='inactive_tunnel.png') }}" alt="Inactive Tunnel" class="h-8 w-auto tunnel-inactive-icon">
+                  {% endif %}
+                </div>
+              </div>
+        
+              <!-- Row for Actions -->
+              <div class="flex space-x-4 pt-3">
+                <!-- Core Actions -->
+                <div class="w-1/2 flex flex-col gap-1.5">
+                  {% if item["backends"]|selectattr("name", "equalto", "xray")|selectattr("running", "equalto", true)|list|length > 0 %}
+                    <!-- Button color changed to Cyan -->
+                    <a href="{{ url_for('overview.overview', node_id=item['id']) }}" class="bg-cyan-500 hover:bg-cyan-600 text-slate-900 font-semibold px-3 py-1.5 rounded text-sm transition-colors neon-hover w-full text-center">
+                      Manage
+                    </a>
+                  {% endif %}
+                  {% if item["name"] == "local" %}
+                    <button id="changeCoreBtn-{{ item['id'] }}" onclick="openChangeCoreModal({{ item['id'] }})" class="bg-purple-600 hover:bg-purple-700 text-white px-3 py-1.5 rounded text-sm transition-colors neon-hover w-full">
+                      Change Core
+                    </button>
+                  {% endif %}
+                  {% if item["backends"]|selectattr("name", "equalto", "xray")|list|length > 0 %}
+                    <button onclick="showRestartConfirm({{ item['id'] }})" class="bg-fuchsia-700 hover:bg-fuchsia-800 text-white px-3 py-1.5 rounded text-sm transition-colors neon-hover w-full">
+                      Restart
+                    </button>
+                  {% endif %}
+                </div>
+                <!-- Vertical Separator -->
+                <div class="vertical-separator"></div>
+                <!-- Tunnel Actions -->
+                <div class="w-1/2 flex flex-col gap-1.5">
+                   {% if item.name == 'local' %}
+                     <button onclick="alert('Manage Tunnel for Node {{ item.id }}')" class="bg-teal-600 hover:bg-teal-700 text-white px-3 py-1.5 rounded text-sm transition-colors neon-hover w-full text-center">Manage Tunnel</button>
+                     <button onclick="alert('Restart Tunnel for Node {{ item.id }}')" class="bg-sky-600 hover:bg-sky-700 text-white px-3 py-1.5 rounded text-sm transition-colors neon-hover w-full text-center">Restart Tunnel</button>
+                   {% else %}
+                      <button onclick="alert('Setup Tunnel for Node {{ item.id }}')" class="bg-gray-500 hover:bg-gray-600 text-white px-3 py-1.5 rounded text-sm transition-colors neon-hover w-full text-center">Setup</button>
+                   {% endif %}
+                </div>
+              </div>
+            </div>
+          {% endfor %}
+        </div>
+        
+        <!-- MODULAR MODALS FOR ADDING NODES -->
+        {% include 'node_installer.html' %}
+
+        <!-- Modal for Changing Core -->
+        <div id="changeCoreModal" class="fixed inset-0 bg-black bg-opacity-50 hidden z-50 flex items-center justify-center">
+          <div class="glass-effect rounded-lg p-6 w-full max-w-md">
+            <h3 class="text-lg font-bold text-cyan-400 mb-4">Change Xray Core</h3>
+            <div id="versionList" class="mb-4 max-h-64 overflow-y-auto">
+              <!-- Versions will be populated dynamically -->
+            </div>
+            <div id="customVersionInput" class="mb-4 hidden">
+              <input type="text" id="customVersionField" class="w-full p-2 bg-gray-800 text-gray-200 rounded border border-gray-700 focus:outline-none focus:border-purple-500" placeholder="e.g., v1.8.23">
+              <p class="text-xs text-gray-400 mt-1">Enter a valid Xray version like v1.8.23</p>
+            </div>
+            <div class="flex justify-between items-center">
+              <div>
+                <button id="customVersionBtn" class="bg-teal-600 hover:bg-teal-700 text-white px-4 py-2 rounded neon-hover hidden">Custom Version</button>
+                <button id="backToListBtn" class="bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded neon-hover hidden">Back</button>
+              </div>
+              <div class="flex space-x-2">
+                <button onclick="closeChangeCoreModal()" class="bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded neon-hover">Cancel</button>
+                <button id="selectVersionBtn" class="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded neon-hover" disabled>Select</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Confirmation Modal for Core Change -->
+        <div id="confirmModal" class="fixed inset-0 bg-black bg-opacity-50 hidden z-50 flex items-center justify-center">
+          <div class="glass-effect rounded-lg p-6 w-full max-w-md">
+            <h3 class="text-lg font-bold text-cyan-400 mb-4">Confirm Core Change</h3>
+            <p class="text-gray-200 mb-4">Are you sure you want to change the Xray core to <span id="selectedVersion"></span>?</p>
+            <div class="flex justify-end space-x-2">
+              <button onclick="closeConfirmModal()" class="bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded neon-hover">No</button>
+              <button onclick="startCoreChange()" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded neon-hover">Yes</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Restart Confirmation Modal -->
+        <div id="restartConfirmModal" class="fixed inset-0 bg-black bg-opacity-50 hidden z-50 flex items-center justify-center">
+          <div class="glass-effect rounded-lg p-6 w-full max-w-md">
+            <h3 class="text-lg font-bold text-cyan-400 mb-4" id="restartConfirmTitle">Confirm Restart</h3>
+            <p class="text-gray-200 mb-4" id="restartConfirmMessage"></p>
+            <div class="flex justify-end space-x-2">
+              <button onclick="closeRestartConfirm()" class="bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded neon-hover">No</button>
+              <button id="confirmRestartBtn" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded neon-hover">Yes</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Progress Modal (for core updates, distinct from node setup) -->
+        <div id="progressModal" class="fixed inset-0 bg-black bg-opacity-50 hidden z-50 flex items-center justify-center">
+          <div class="glass-effect rounded-lg p-6 w-full max-w-md">
+            <h3 class="text-lg font-bold text-cyan-400 mb-4">Updating Core</h3>
+            <p class="text-gray-200 mb-4">Please wait and do not refresh the page until the task is finished.</p>
+            <div class="w-full bg-gray-700 rounded-full h-4 mb-4 relative">
+              <div id="progressBar" class="bg-purple-600 h-4 rounded-full transition-all duration-300" style="width: 0%"></div>
+              <span id="progressPercentage" class="absolute inset-0 flex items-center justify-center text-xs text-white font-semibold">0%</span>
+            </div>
+            <p id="progressMessage" class="text-gray-200 text-sm"></p>
+          </div>
+        </div>
+      </main>
+
+      <!-- JavaScript -->
+      <script>
+        const supportToggle = document.getElementById('supportToggle');
+        const supportDropdown = document.getElementById('supportDropdown');
+        supportToggle.addEventListener('click', () => {
+          supportDropdown.classList.toggle('hidden');
+        });
+        document.addEventListener('click', (e) => {
+          if (!supportToggle.contains(e.target) && !supportDropdown.contains(e.target)) {
+            supportDropdown.classList.add('hidden');
+          }
+        });
+
+        let currentNodeId = null;
+        let selectedVersion = null;
+        let versionListContent = null;
+        let restartNodeId = null;
+        let restartAction = null;
+
+        function openChangeCoreModal(nodeId) {
+          currentNodeId = nodeId;
+          const button = document.getElementById(`changeCoreBtn-${nodeId}`);
+          button.textContent = 'Loading...';
+          button.disabled = true;
+
+          fetch('/get_xray_versions')
+            .then(response => response.json())
+            .then(data => {
+              button.textContent = 'Change Xray Core';
+              button.disabled = false;
+
+              if (data.error) {
+                alert(data.error);
+                return;
+              }
+              const versionList = document.getElementById('versionList');
+              versionList.innerHTML = '';
+              data.versions.forEach((version, index) => {
+                const div = document.createElement('div');
+                div.className = 'flex items-center p-2 hover:bg-gray-700/70 rounded cursor-pointer';
+                div.innerHTML = `
+                  <input type="radio" name="version" value="${version}" id="version${index}" class="mr-2">
+                  <label for="version${index}" class="text-gray-200">${version}</label>
+                `;
+                div.onclick = () => {
+                  document.getElementById(`version${index}`).checked = true;
+                  selectedVersion = version;
+                  document.getElementById('selectVersionBtn').disabled = false;
+                };
+                versionList.appendChild(div);
+              });
+              versionListContent = versionList.innerHTML;
+              document.getElementById('customVersionBtn').classList.remove('hidden');
+              document.getElementById('changeCoreModal').classList.remove('hidden');
+            })
+            .catch(err => {
+              button.textContent = 'Change Xray Core';
+              button.disabled = false;
+              alert('Failed to fetch versions: ' + err);
+            });
+        }
+
+        function closeChangeCoreModal(resetSelection = true) {
+          document.getElementById('changeCoreModal').classList.add('hidden');
+          document.getElementById('versionList').classList.remove('hidden');
+          document.getElementById('customVersionInput').classList.add('hidden');
+          document.getElementById('customVersionBtn').classList.remove('hidden');
+          document.getElementById('backToListBtn').classList.add('hidden');
+          if (resetSelection) {
+            selectedVersion = null;
+            document.getElementById('selectVersionBtn').disabled = true;
+            document.getElementById('customVersionField').value = '';
+          }
+        }
+
+        async function populateXrayVersionsDropdown() {
+          const selectEl = document.getElementById('xrayVersionSelect');
+          selectEl.innerHTML = '<option value=\"\">Loading versions...</option>';
+          selectEl.disabled = true;
+          try {
+            const response = await fetch('/get_xray_versions');
+            if (!response.ok) {
+              throw new Error(`HTTP error ${response.status}`);
+            }
+            const data = await response.json();
+            if (data.error) {
+              throw new Error(data.error);
+            }
+            selectEl.innerHTML = '<option value=\"\">Select Xray Version (Optional)</option>';
+            if (data.versions && data.versions.length > 0) {
+              selectEl.innerHTML = ''; 
+              data.versions.forEach((version, index) => {
+                const option = document.createElement('option');
+                option.value = version;
+                option.textContent = index === 0 ? `${version} (latest)` : version;
+                selectEl.appendChild(option);
+              });
+              if (data.versions.length > 0) {
+                selectEl.value = data.versions[0];
+              }
+            } else {
+              selectEl.innerHTML = '<option value=\"\">No versions found</option>';
+            }
+          } catch (error) {
+            console.error('Failed to load Xray versions:', error);
+            selectEl.innerHTML = `<option value=\"\">Error loading versions</option>`;
+          } finally {
+            selectEl.disabled = false;
+          }
+        }
+
+        function showCustomVersionInput() {
+          document.getElementById('versionList').classList.add('hidden');
+          document.getElementById('customVersionInput').classList.remove('hidden');
+          document.getElementById('customVersionBtn').classList.add('hidden');
+          document.getElementById('backToListBtn').classList.remove('hidden');
+          document.getElementById('selectVersionBtn').disabled = !document.getElementById('customVersionField').value;
+        }
+
+        function backToVersionList() {
+          document.getElementById('versionList').innerHTML = versionListContent;
+          document.getElementById('versionList').classList.remove('hidden');
+          document.getElementById('customVersionInput').classList.add('hidden');
+          document.getElementById('customVersionBtn').classList.remove('hidden');
+          document.getElementById('backToListBtn').classList.add('hidden');
+          selectedVersion = null;
+          document.getElementById('selectVersionBtn').disabled = true;
+        }
+
+        function showConfirmModal() {
+          if (!selectedVersion) {
+            const customVersion = document.getElementById('customVersionField').value.trim();
+            if (customVersion) {
+              selectedVersion = customVersion;
+            } else {
+              alert('Please select a version or enter a custom version!');
+              return;
+            }
+          }
+          document.getElementById('selectedVersion').textContent = selectedVersion;
+          document.getElementById('confirmModal').classList.remove('hidden');
+          closeChangeCoreModal(false);
+        }
+
+        function closeConfirmModal() {
+          document.getElementById('confirmModal').classList.add('hidden');
+        }
+
+        function showRestartConfirm(nodeId) {
+          restartNodeId = nodeId;
+          restartAction = 'single';
+          document.getElementById('restartConfirmTitle').textContent = 'Confirm Xray Restart';
+          document.getElementById('restartConfirmMessage').textContent = `Are you sure you want to restart Xray on node ${nodeId}?`;
+          document.getElementById('restartConfirmModal').classList.remove('hidden');
+          document.getElementById('confirmRestartBtn').onclick = () => restartCore(nodeId, 'xray');
+        }
+
+        function showRestartAllConfirm() {
+          restartNodeId = null;
+          restartAction = 'all';
+          document.getElementById('restartConfirmTitle').textContent = 'Confirm All Xray Restarts';
+          document.getElementById('restartConfirmMessage').textContent = 'Are you sure you want to restart Xray cores across all nodes? This may disrupt Xray services.';
+          document.getElementById('restartConfirmModal').classList.remove('hidden');
+          document.getElementById('confirmRestartBtn').onclick = restartAllXrayCores;
+        }
+
+        function closeRestartConfirm() {
+          document.getElementById('restartConfirmModal').classList.add('hidden');
+          restartNodeId = null;
+          restartAction = null;
+        }
+
+        function startCoreChange() {
+          if (!selectedVersion) {
+            alert('No version selected! Please choose a version.');
+            return;
+          }
+          document.getElementById('confirmModal').classList.add('hidden');
+          document.getElementById('progressModal').classList.remove('hidden');
+          document.getElementById('progressBar').style.width = '0%';
+          document.getElementById('progressPercentage').textContent = '0%';
+          document.getElementById('progressMessage').textContent = 'Initializing...';
+
+          fetch(`/change_core/${currentNodeId}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ version: selectedVersion })
+          })
+            .then(response => {
+              if (!response.ok) {
+                return response.text().then(text => { throw new Error(`Server error: ${text}`); });
+              }
+              const reader = response.body.getReader();
+              const decoder = new TextDecoder();
+
+              function readStream() {
+                reader.read().then(({ done, value }) => {
+                  if (done) {
+                    console.log('Stream completed');
+                    return;
+                  }
+                  const chunk = decoder.decode(value, { stream: true });
+                  chunk.split('\n\n').forEach(event => {
+                    if (event.startsWith('data: ')) {
+                      try {
+                        const data = JSON.parse(event.slice(6));
+                        const bar = document.getElementById('progressBar');
+                        const percentage = document.getElementById('progressPercentage');
+                        const message = document.getElementById('progressMessage');
+
+                        if ('progress' in data) {
+                          bar.style.width = `${data.progress}%`;
+                          percentage.textContent = `${data.progress}%`;
+                        }
+                        message.textContent = data.message;
+
+                        if (data.done || data.status === 'success') {
+                          setTimeout(() => {
+                            document.getElementById('progressModal').classList.add('hidden');
+                            const duration = data.duration || data.message.split(' ').pop();
+                            showNotification(`Core updated successfully in ${duration} seconds.`);
+                            setTimeout(() => location.reload(), 2000);
+                          }, 1000);
+                        } else if (data.error || data.message === 'Download failed.') {
+                          setTimeout(() => {
+                            document.getElementById('progressModal').classList.add('hidden');
+                            alert(`Error: ${data.message}`);
+                          }, 1000);
+                        }
+                      } catch (e) {
+                        console.error('JSON parse error:', e);
+                      }
+                    }
+                  });
+                  readStream();
+                }).catch(err => {
+                  document.getElementById('progressModal').classList.add('hidden');
+                  alert('Stream error: ' + err.message);
+                });
+              }
+              readStream();
+            })
+            .catch(err => {
+              document.getElementById('progressModal').classList.add('hidden');
+              alert('Fetch error: ' + err.message);
+            });
+        }
+
+        // Restart Functions
+        function restartCore(nodeId, coreName) {
+          if (coreName !== 'xray') return; // Only allow Xray restarts
+          closeRestartConfirm();
+          fetch(`/node/${nodeId}/restart_cores`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ cores: ['xray'] })
+          })
+            .then(response => response.json())
+            .then(data => {
+              if (data['xray'] && data['xray'].status === 'success') {
+                showNotification(`Successfully restarted Xray on node ${nodeId}`);
+                setTimeout(() => location.reload(), 2000);
+              } else {
+                alert(`Failed to restart Xray: ${data['xray'].message}`);
+              }
+            })
+            .catch(err => alert('Error restarting Xray: ' + err.message));
+        }
+
+        function restartAllXrayCores() {
+          closeRestartConfirm();
+          document.getElementById('restartAllNodesCoresBtn').disabled = true;
+          document.getElementById('restartAllNodesCoresBtn').textContent = 'Restarting...';
+          fetch('/restart_all_nodes_cores', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({})
+          })
+            .then(response => response.json())
+            .then(data => {
+              document.getElementById('restartAllNodesCoresBtn').disabled = false;
+              document.getElementById('restartAllNodesCoresBtn').textContent = 'Restart All Xray Cores';
+              let allSuccess = true;
+              let messages = [];
+              for (const nodeId in data) {
+                let nodeMessage = `Node ${nodeId}: `;
+                if (data[nodeId]['xray']) {
+                  if (data[nodeId]['xray'].status === 'success') {
+                    nodeMessage += `Xray OK`;
+                  } else {
+                    allSuccess = false;
+                    nodeMessage += `Xray (${data[nodeId]['xray'].message})`;
+                  }
+                } else {
+                  nodeMessage += 'Xray not present';
+                }
+                messages.push(nodeMessage);
+              }
+              if (allSuccess) {
+                showNotification('All Xray cores across all nodes restarted successfully');
+                setTimeout(() => location.reload(), 2000);
+              } else {
+                alert(`Restart results:\n${messages.join('\n')}`);
+              }
+            })
+            .catch(err => {
+              document.getElementById('restartAllNodesCoresBtn').disabled = false;
+              document.getElementById('restartAllNodesCoresBtn').textContent = 'Restart All Xray Cores';
+              alert('Error restarting all Xray cores: ' + err.message);
+            });
+        }
+
+        function showNotification(message) {
+          const notification = document.createElement('div');
+          notification.className = 'notification';
+          notification.textContent = message;
+          document.body.appendChild(notification);
+          setTimeout(() => notification.remove(), 5000);
+        }
+
+        document.getElementById('selectVersionBtn').addEventListener('click', showConfirmModal);
+        document.getElementById('customVersionBtn').addEventListener('click', showCustomVersionInput);
+        document.getElementById('backToListBtn').addEventListener('click', backToVersionList);
+        document.getElementById('customVersionField').addEventListener('input', (e) => {
+          document.getElementById('selectVersionBtn').disabled = !e.target.value.trim();
+        });
+      </script>
+    </body>
+</html>

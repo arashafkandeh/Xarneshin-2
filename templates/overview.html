@@ -1,0 +1,1226 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Xarzneshin Core Manager - Overview</title>
+    <!-- Tailwind CSS via CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts: Inter -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+      body {
+        background: linear-gradient(135deg, #0d1b2a, #1b263b);
+        font-family: 'Inter', sans-serif;
+        overflow-x: hidden;
+        margin: 0;
+        padding: 0;
+      }
+      .glass-effect {
+        background: rgba(27, 38, 59, 0.7);
+        backdrop-filter: blur(10px);
+        border: 1px solid rgba(167, 139, 250, 0.3);
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+      }
+      .neon-hover {
+        transition: all 0.3s ease;
+      }
+      .neon-hover:hover {
+        box-shadow: 0 0 15px rgba(167, 139, 250, 0.7);
+        transform: translateY(-2px);
+      }
+      @keyframes slideDownUp {
+        0% { top: -50px; opacity: 0; }
+        20% { top: 20px; opacity: 1; }
+        80% { top: 20px; opacity: 1; }
+        100% { top: -50px; opacity: 0; }
+      }
+      .notification {
+        position: fixed;
+        left: 50%;
+        transform: translateX(-50%);
+        background: linear-gradient(45deg, #facc15, #fbbf24);
+        color: #1e293b;
+        padding: 0.75rem 1.5rem;
+        border-radius: 0.75rem;
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+        z-index: 100;
+        animation: slideDownUp 5s forwards;
+        font-weight: 500;
+        letter-spacing: 0.5px;
+        max-width: 90%;
+        text-align: center;
+      }
+      .notification.success {
+        background: linear-gradient(45deg, #4ade80, #22c55e);
+        color: #fff;
+      }
+      .notification.error {
+        background: linear-gradient(45deg, #f87171, #ef4444);
+        color: #fff;
+      }
+      ::-webkit-scrollbar {
+        width: 8px;
+      }
+      @media (min-width: 640px) {
+        ::-webkit-scrollbar {
+          width: 6px;
+        }
+      }
+      ::-webkit-scrollbar-track {
+        background: #1b263b;
+      }
+      ::-webkit-scrollbar-thumb {
+        background: #a78bfa;
+        border-radius: 4px;
+      }
+      ::-webkit-scrollbar-thumb:hover {
+        background: #c4b5fd;
+      }
+      #sidebarOverlay {
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.5);
+        z-index: 40;
+      }
+      #sidebarOverlay.active {
+        display: block;
+      }
+      #wrapper {
+        margin: 0 auto;
+        max-width: 900px;
+      }
+      #sidebar {
+        position: fixed;
+        top: 0;
+        left: 0;
+        height: 100%;
+        width: 14rem;
+        transform: translateX(-100%);
+        transition: transform 0.3s ease;
+      }
+      #sidebar.open {
+        transform: translateX(0);
+      }
+      @media (max-width: 640px) {
+        #wrapper {
+          display: flex;
+          transition: max-width 0.3s ease;
+        }
+        #sidebar {
+          width: 14rem;
+          transform: translateX(0);
+        }
+        #sidebar.closed {
+          width: 0;
+          overflow: hidden;
+        }
+      }
+      .futuristic-card, .ultra-futuristic-card {
+        border-radius: 0.5rem;
+        padding: 0.75rem;
+        margin-bottom: 1rem;
+        width: 100%;
+      }
+      .futuristic-card {
+        background: linear-gradient(135deg, #2a2d3e, #181a29);
+        border: 2px solid #4f46e5;
+        box-shadow: 0 0 10px rgba(79, 70, 229, 0.7);
+      }
+      .ultra-futuristic-card {
+        background: linear-gradient(135deg, #143233, #0a1c1c);
+        border: 2px solid #00ffc8;
+        box-shadow: 0 0 12px rgba(0, 255, 200, 0.8);
+      }
+      .two-columns {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 1rem;
+        margin-bottom: 1rem;
+        align-items: stretch;
+      }
+      .two-columns > section {
+        flex: 1 1 0;
+        min-width: 300px;
+      }
+      .stats-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 0.875rem;
+      }
+      .stats-table th,
+      .stats-table td {
+        padding: 0.4rem 0.6rem;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+        text-align: left;
+      }
+      .stats-table th {
+        font-weight: bold;
+        background: rgba(255, 255, 255, 0.05);
+      }
+      .value-cell {
+        font-weight: bold;
+        color: #a5b4fc;
+      }
+      .progress-container {
+        background: #374151;
+        border-radius: 0.25rem;
+        overflow: hidden;
+        height: 0.75rem;
+      }
+      .progress-bar {
+        height: 100%;
+        background: linear-gradient(90deg, #a5b4fc, #06b6d4);
+        width: 0%;
+        transition: width 0.5s ease;
+      }
+      .ip-capsule {
+        display: inline-block;
+        padding: 0.25rem 0.75rem;
+        background-color: #1f2937;
+        border: 1px solid #a78bfa;
+        border-radius: 9999px;
+        color: #a5b4fc;
+        cursor: pointer;
+        transition: background-color 0.3s;
+      }
+      .ip-capsule:hover {
+        background-color: #374151;
+      }
+      .minimizable-container .always-visible p {
+        margin-bottom: 0.25rem;
+      }
+      .expandable-content.hidden {
+        display: none;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="notificationContainer"></div>
+    <div class="relative">
+      <!-- Sidebar Overlay -->
+      <div id="sidebarOverlay" onclick="closeSidebar()"></div>
+      <!-- Sidebar -->
+      <aside
+        id="sidebar"
+        class="glass-effect z-50"
+      >
+        <div class="flex flex-col h-full py-4 sm:py-6">
+          <div class="flex justify-between items-center mb-6 px-4 sm:px-6">
+            <span class="text-xl sm:text-2xl font-semibold tracking-wide text-cyan-400">
+              Xarzneshin
+            </span>
+            <button
+              id="closeSidebarButton"
+              class="text-gray-300 hover:text-cyan-400 text-2xl focus:outline-none sm:hidden"
+              onclick="closeSidebar()"
+            >
+              ×
+            </button>
+          </div>
+          <nav class="flex-1 px-4 sm:px-6 space-y-2 sm:space-y-3">
+            <a
+              href="{{ url_for('overview.overview', node_id=node_id) }}"
+              class="block px-3 sm:px-4 py-2 sm:py-3 rounded-lg text-gray-300 hover:text-cyan-400 bg-gray-900/50 neon-hover"
+            >
+              Overview
+            </a>
+            <a
+              href="/node/{{ node_id }}/inbounds"
+              class="block px-3 sm:px-4 py-2 sm:py-3 rounded-lg text-gray-300 hover:text-cyan-400 neon-hover"
+            >
+              Inbounds
+            </a>
+            <a
+              href="/node/{{ node_id }}/outbounds"
+              class="block px-3 sm:px-4 py-2 sm:py-3 rounded-lg text-gray-300 hover:text-cyan-400 neon-hover"
+            >
+              Outbounds
+            </a>
+            <a
+              href="/node/{{ node_id }}/rules"
+              class="block px-3 sm:px-4 py-2 sm:py-3 rounded-lg text-gray-300 hover:text-cyan-400 neon-hover"
+            >
+              Routing Rules
+            </a>
+            <a
+              href="/node/{{ node_id }}/dns"
+              class="block px-3 sm:px-4 py-2 sm:py-3 rounded-lg text-gray-300 hover:text-cyan-400 neon-hover"
+            >
+              DNS
+            </a>
+            <a
+              href="/node/{{ node_id }}/balancers"
+              class="block px-3 sm:px-4 py-2 sm:py-3 rounded-lg text-gray-300 hover:text-cyan-400 neon-hover"
+            >
+              Balancer
+            </a>
+            <a
+              href="/node/{{ node_id }}/reverse"
+              class="block px-3 sm:px-4 py-2 sm:py-3 rounded-lg text-gray-300 hover:text-cyan-400 neon-hover"
+            >
+              Reverse
+            </a>
+            <a
+              href="/node/{{ node_id }}/advance"
+              class="block px-3 sm:px-4 py-2 sm:py-3 rounded-lg text-gray-300 hover:text-cyan-400 neon-hover"
+            >
+              Advance Settings & Editor
+            </a>
+            <a
+              href="/nodes"
+              class="block px-3 sm:px-4 py-2 sm:py-3 rounded-lg text-gray-300 hover:text-cyan-400 neon-hover"
+            >
+              Back to Nodes
+            </a>
+          </nav>
+          <div class="px-4 sm:px-6 mt-6">
+            <a
+              href="/logout"
+              class="block w-full text-left px-3 sm:px-4 py-2 sm:py-3 rounded-lg bg-red-600 hover:bg-red-700 text-white neon-hover"
+            >
+              Logout
+            </a>
+          </div>
+        </div>
+      </aside>
+      <!-- Main Content -->
+      <div id="wrapper">
+        <div id="mainContent">
+          <header class="flex items-center py-3 sm:py-4">
+            <button
+              id="hamburgerButton"
+              class="p-2 text-gray-300 hover:text-cyan-400 transition focus:outline-none"
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                class="h-6 w-6 sm:h-7 sm:w-7"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
+              </svg>
+            </button>
+            <h1 class="text-xl sm:text-2xl md:text-3xl ml-3 sm:ml-4 font-semibold text-gray-100 tracking-wide">
+              Dashboard
+            </h1>
+          </header>
+
+            <div class="two-columns gap-4">
+              <!-- کارت سمت چپ -->
+              <section class="futuristic-card glass-effect p-4 sm:p-6 flex flex-col justify-between">
+                <div>
+                  <h2 class="text-lg sm:text-xl font-semibold text-cyan-400 mb-3 sm:mb-4">System Usage</h2>
+                  <div class="space-y-3 sm:space-y-4">
+                    <div>
+                      <div class="flex justify-between mb-1">
+                        <span class="text-sm sm:text-base text-gray-300">CPU Usage</span>
+                        <span id="cpuPercent" class="text-sm sm:text-base font-bold text-cyan-400">0%</span>
+                      </div>
+                      <div class="progress-container">
+                        <div id="cpuBar" class="progress-bar"></div>
+                      </div>
+                    </div>
+                    <div>
+                      <div class="flex justify-between mb-1">
+                        <span class="text-sm sm:text-base text-gray-300">RAM Usage</span>
+                        <span id="ramPercent" class="text-sm sm:text-base font-bold text-cyan-400">0%</span>
+                      </div>
+                      <div class="progress-container">
+                        <div id="ramBar" class="progress-bar"></div>
+                      </div>
+                    </div>
+                    <div>
+                      <div class="flex justify-between mb-1">
+                        <span class="text-sm sm:text-base text-gray-300">Swap Usage</span>
+                        <span id="swapPercent" class="text-sm sm:text-base font-bold text-cyan-400">0%</span>
+                      </div>
+                      <div class="progress-container">
+                        <div id="swapBar" class="progress-bar"></div>
+                      </div>
+                    </div>
+                    <div>
+                      <div class="flex justify-between mb-1">
+                        <span class="text-sm sm:text-base text-gray-300">Disk Usage</span>
+                        <span id="diskPercent" class="text-sm sm:text-base font-bold text-cyan-400">0%</span>
+                      </div>
+                      <div class="progress-container">
+                        <div id="diskBar" class="progress-bar"></div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <div class="mt-4 flex justify-between gap-2 pt-2">
+                  {% if not is_local_node %}
+                  <button id="rebootVpsBtn" class="flex-1 min-w-[140px] px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 text-sm sm:text-base neon-hover text-center">
+                    Reboot VPS
+                  </button>
+                  {% endif %}
+                  <button id="clearCacheBtn" class="flex-1 min-w-[140px] px-4 py-2 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700 text-sm sm:text-base neon-hover text-center">
+                    Clear Cache
+                  </button>
+                </div>
+              </section>
+            
+              <!-- کارت سمت راست -->
+              <section class="futuristic-card glass-effect p-4 sm:p-6 flex flex-col justify-between">
+                <div>
+                  <h2 class="text-lg sm:text-xl font-semibold text-cyan-400 mb-3 sm:mb-4">Node & Uptime Stats</h2>
+                  <table class="stats-table mb-4">
+                    <tr>
+                      <th class="text-sm sm:text-base text-gray-300">Parameter</th>
+                      <th class="text-sm sm:text-base text-gray-300">Value</th>
+                    </tr>
+                    <tr>
+                      <td class="text-sm sm:text-base text-gray-300">Node Status</td>
+                      <td id="nodeStatus" class="value-cell text-sm sm:text-base">{{ stats.status }}</td>
+                    </tr>
+                    <tr>
+                      <td class="text-sm sm:text-base text-gray-300">Xray Version</td>
+                      <td class="value-cell text-sm sm:text-base">
+                        <div class="flex justify-between items-center w-full">
+                          <span id="xrayVersion" class="text-yellow-400">{{ stats.xray_version }}</span>
+                          <button id="changeVersionBtn" data-is-local="{{ is_local_node | tojson }}" class="px-2 py-1 bg-gradient-to-r from-indigo-500 to-purple-500 text-white rounded-md hover:from-indigo-600 hover:to-purple-600 text-xs neon-hover">Change</button>
+                        </div>
+                      </td>
+                    </tr>
+                    <tr>
+                      <td class="text-sm sm:text-base text-gray-300">Container Uptime</td>
+                      <td id="containerUptimeValue" class="value-cell text-sm sm:text-base text-gray-200">Loading...</td>
+                    </tr>
+                    <tr>
+                      <td class="text-sm sm:text-base text-gray-300">Full Stack Uptime</td>
+                      <td id="fullUptimeValue" class="value-cell text-sm sm:text-base text-gray-200">Loading...</td>
+                    </tr>
+                    <tr>
+                      <td class="text-sm sm:text-base text-gray-300">Xray Uptime</td>
+                      <td id="xrayUptimeValue" class="value-cell text-sm sm:text-base text-gray-200">Loading...</td>
+                    </tr>
+                  </table>
+                </div>
+                <div>
+                  <div class="flex justify-between gap-2">
+                    <button id="restartContainerBtn" class="flex-1 min-w-[140px] px-4 py-2 bg-[#1d63ed] text-white rounded-lg hover:bg-[#154abc] text-sm sm:text-base neon-hover text-center">
+                      Restart Container
+                    </button>
+                    <button id="fullRestartBtn" class="flex-1 min-w-[140px] px-4 py-2 bg-[#1d63ed] text-white rounded-lg hover:bg-[#154abc] text-sm sm:text-base neon-hover text-center">
+                      Restart Full Stack
+                    </button>
+                  </div>
+                  <div class="loader text-center mt-2 text-sm sm:text-base text-gray-300" id="containerLoader" style="display:none;">Restart in progress...</div>
+                  <div class="loader text-center mt-2 text-sm sm:text-base text-gray-300" id="fullLoader" style="display:none;">Restart in progress...</div>
+                </div>
+              </section>
+            </div>
+
+            </section>
+          </div>
+          <section class="ultra-futuristic-card glass-effect p-4 sm:p-6">
+            <h2 class="text-lg sm:text-xl font-semibold text-cyan-400 mb-3 sm:mb-4">Network & OS Stats</h2>
+            <div class="minimizable-container">
+              <div class="always-visible flex justify-between items-center">
+                <div>
+                  <p class="mb-1 text-sm sm:text-base">
+                    <strong class="text-gray-300">TCP Connections:</strong>
+                    <span id="tcpConnections" class="font-bold text-cyan-400">Loading...</span>
+                  </p>
+                  <p class="mb-1 text-sm sm:text-base">
+                    <strong class="text-gray-300">UDP Connections:</strong>
+                    <span id="udpConnections" class="font-bold text-cyan-400">Loading...</span>
+                  </p>
+                </div>
+                <button id="toggleExpandBtn" onclick="toggleExpandable(event)" class="p-1 bg-gray-700 text-white rounded-lg focus:outline-none neon-hover">▼</button>
+              </div>
+              <div id="expandableContent" class="expandable-content hidden mt-2 sm:mt-3">
+                <p class="mb-1 text-sm sm:text-base">
+                  <strong class="text-gray-300">Upload Speed:</strong>
+                  <span id="uploadSpeed" class="font-bold text-cyan-400">Loading...</span>
+                  <span class="text-yellow-400">/s</span>
+                </p>
+                <p class="mb-1 text-sm sm:text-base">
+                  <strong class="text-gray-300">Download Speed:</strong>
+                  <span id="downloadSpeed" class="font-bold text-cyan-400">Loading...</span>
+                  <span class="text-yellow-400">/s</span>
+                </p>
+                <p class="mb-1 text-sm sm:text-base">
+                  <strong class="text-gray-300">Total Data Sent:</strong>
+                  <span id="totalSent" class="font-bold text-cyan-400">Loading...</span>
+                </p>
+                <p class="mb-1 text-sm sm:text-base">
+                  <strong class="text-gray-300">Total Data Received:</strong>
+                  <span id="totalRecv" class="font-bold text-cyan-400">Loading...</span>
+                </p>
+                <p class="mb-1 text-sm sm:text-base">
+                  <strong class="text-gray-300">IPv4 Address:</strong>
+                  <span id="ipv4Addr" class="ip-capsule" onclick="copyIP('ipv4Addr')">Loading...</span>
+                </p>
+                <p class="mb-1 text-sm sm:text-base">
+                  <strong class="text-gray-300">IPv6 Address:</strong>
+                  <span id="ipv6Addr" class="ip-capsule" onclick="copyIP('ipv6Addr')">Loading...</span>
+                </p>
+                <div>
+                  <h3 class="text-sm sm:text-base font-semibold border-b pb-1 text-cyan-400">Operating System</h3>
+                  <p class="mb-1 text-sm sm:text-base">
+                    <strong class="text-gray-300">OS Uptime:</strong>
+                    <span id="osUptime" class="font-bold text-gray-200">Loading...</span>
+                  </p>
+                </div>
+              </div>
+            </div>
+          </section>
+        </div>
+      </div>
+    </div>
+
+    <div id="changeVersionModal" class="fixed inset-0 bg-black bg-opacity-75 hidden z-50 flex items-center justify-center px-4">
+      <div class="glass-effect rounded-lg p-6 sm:p-8 w-full max-w-lg md:max-w-2xl shadow-xl transform transition-all sm:my-8 opacity-0 translate-y-10 overflow-y-auto max-h-[85vh]"
+           role="dialog" aria-modal="true" aria-labelledby="changeVersionModalTitle">
+        <div class="flex justify-between items-center mb-6">
+          <h3 id="changeVersionModalTitle" class="text-xl sm:text-2xl font-bold text-cyan-400">Change Xray Core</h3>
+          <button type="button" id="closeChangeVersionModalBtn"
+                  class="text-gray-400 hover:text-gray-200 transition-colors">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+          </button>
+        </div>
+        <form id="changeVersionForm">
+          <fieldset id="changeVersionFieldset">
+            <!-- SSH Credentials Toggle -->
+            <div id="customSshToggleContainer">
+                <div class="mb-4 flex items-center">
+                  <label for="useCustomSsh" class="flex items-center cursor-pointer">
+                    <div class="relative">
+                      <input type="checkbox" id="useCustomSsh" class="sr-only peer">
+                      <div class="w-10 h-6 bg-gray-600 rounded-full shadow-inner peer-checked:bg-purple-600 transition-colors"></div>
+                      <div class="dot absolute left-1 top-1 bg-white w-4 h-4 rounded-full transition-transform peer-checked:translate-x-full"></div>
+                    </div>
+                    <div class="ml-3 text-sm font-medium text-gray-300">Use Custom SSH Credentials</div>
+                  </label>
+                </div>
+            </div>
+            
+            <!-- Custom SSH Fields Container (Hidden by default) -->
+            <div id="customSshFieldsContainer" class="hidden grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4 mb-4">
+              <div>
+                <label for="sshServerIP" class="block text-sm font-medium text-gray-300 mb-1">Server IP Address</label>
+                <input type="text" id="sshServerIP" name="serverIP"
+                      class="w-full p-2.5 bg-gray-800/60 text-gray-100 rounded-lg border border-gray-700 focus:outline-none focus:border-purple-500"
+                      placeholder="Required for custom connection">
+              </div>
+              <div>
+                <label for="sshUser" class="block text-sm font-medium text-gray-300 mb-1">SSH Username</label>
+                <input type="text" id="sshUser" name="sshUser"
+                      class="w-full p-2.5 bg-gray-800/60 text-gray-100 rounded-lg border border-gray-700 focus:outline-none focus:border-purple-500"
+                      placeholder="Required for custom connection">
+              </div>
+              <div>
+                <label for="sshPassword" class="block text-sm font-medium text-gray-300 mb-1">SSH Password</label>
+                <input type="password" id="sshPassword" name="sshPassword"
+                      class="w-full p-2.5 bg-gray-800/60 text-gray-100 rounded-lg border border-gray-700 focus:outline-none focus:border-purple-500"
+                      placeholder="Required for custom connection">
+              </div>
+              <div>
+                <label for="sshPort" class="block text-sm font-medium text-gray-300 mb-1">SSH Port</label>
+                <input type="number" id="sshPort" name="sshPort"
+                      class="w-full p-2.5 bg-gray-800/60 text-gray-100 rounded-lg border border-gray-700 focus:outline-none focus:border-purple-500"
+                      placeholder="Required for custom connection">
+              </div>
+            </div>
+            
+            <!-- Version selection -->
+            <div class="grid grid-cols-1 gap-y-4">
+              <div>
+                <label for="sshXrayVersionSelect" class="block text-sm font-medium text-gray-300 mb-1">Select Xray Version</label>
+                <select id="sshXrayVersionSelect"
+                        class="w-full p-2.5 bg-gray-800/60 text-gray-100 rounded-lg border border-gray-700 focus:outline-none focus:border-purple-500">
+                    <option value="">Loading versions...</option>
+                </select>
+              </div>
+              <div class="mt-2 flex items-center">
+                <label for="sshUseProxy" class="flex items-center cursor-pointer">
+                    <div class="relative">
+                        <input type="checkbox" id="sshUseProxy" class="sr-only peer">
+                        <div class="w-10 h-6 bg-gray-600 rounded-full shadow-inner peer-checked:bg-purple-600"></div>
+                        <div class="dot absolute left-1 top-1 bg-white w-4 h-4 rounded-full transition-transform peer-checked:translate-x-full"></div>
+                    </div>
+                    <div class="ml-3 text-sm font-medium text-gray-300">Iran Node (Use Proxy)</div>
+                </label>
+              </div>
+            </div>
+            
+            <div id="sshProxyFieldsContainer" class="hidden mt-4 p-4 border border-gray-700 rounded-lg bg-gray-800/30">
+                <h4 class="text-md font-semibold text-purple-400 mb-3">SOCKS5 Proxy Settings</h4>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
+                    <div>
+                        <label for="sshProxyIP" class="block text-sm font-medium text-gray-300 mb-1">Proxy IP</label>
+                        <input type="text" id="sshProxyIP"
+                            class="w-full p-2.5 bg-gray-800/60 text-gray-100 rounded-lg border border-gray-700 focus:outline-none focus:border-purple-500" placeholder="e.g., 127.0.0.1">
+                    </div>
+                    <div>
+                        <label for="sshProxyPort" class="block text-sm font-medium text-gray-300 mb-1">Proxy Port</label>
+                        <input type="number" id="sshProxyPort"
+                            class="w-full p-2.5 bg-gray-800/60 text-gray-100 rounded-lg border border-gray-700 focus:outline-none focus:border-purple-500" placeholder="e.g., 1080">
+                    </div>
+                    <div>
+                        <label for="sshProxyUser" class="block text-sm font-medium text-gray-300 mb-1">Proxy User <span class="text-xs text-gray-500">(Optional)</span></label>
+                        <input type="text" id="sshProxyUser"
+                            class="w-full p-2.5 bg-gray-800/60 text-gray-100 rounded-lg border border-gray-700 focus:outline-none focus:border-purple-500" placeholder="Proxy username">
+                    </div>
+                    <div>
+                        <label for="sshProxyPassword" class="block text-sm font-medium text-gray-300 mb-1">Proxy Password <span class="text-xs text-gray-500">(Optional)</span></label>
+                        <input type="password" id="sshProxyPassword"
+                            class="w-full p-2.5 bg-gray-800/60 text-gray-100 rounded-lg border border-gray-700 focus:outline-none focus:border-purple-500" placeholder="Proxy password">
+                    </div>
+            
+                    <!-- START: ADDED BUTTONS BLOCK -->
+                    <div class="md:col-span-2 flex items-center justify-between mt-4">
+                        <div class="flex items-center space-x-2">
+                          <button type="button" id="sshTestConnectionBtn"
+                                  class="px-4 py-2 rounded-lg text-sm font-medium text-white bg-teal-600 hover:bg-teal-700 focus:outline-none focus:ring-2 focus:ring-teal-500 transition-colors neon-hover">
+                            Test Proxy
+                          </button>
+                          <span id="sshProxyTestResult" class="text-sm text-gray-400"></span>
+                        </div>
+                        <a href="https://github.com/ArashAfkandeh/Microsocks" target="_blank" rel="noopener noreferrer"
+                           class="inline-block px-4 py-2 rounded-lg text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors neon-hover">
+                          Setup Proxy
+                        </a>
+                    </div>
+                    <!-- END: ADDED BUTTONS BLOCK -->
+            
+                </div>
+            </div>
+
+            <div class="flex justify-end space-x-4 mt-8">
+              <button type="button" id="cancelChangeVersionBtn"
+                      class="px-6 py-2.5 rounded-lg text-sm font-medium text-gray-300 bg-gray-700 hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-500 transition-colors neon-hover">
+                Cancel
+              </button>
+              <button type="submit" id="submitChangeVersionBtn"
+                      class="px-6 py-2.5 rounded-lg text-sm font-medium text-white bg-purple-600 hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 focus:ring-offset-gray-900 transition-colors neon-hover">
+                Change Version
+              </button>
+            </div>
+          </fieldset>
+        </form>
+      </div>
+    </div>
+
+    <script>
+      function showNotification(message, type = 'default') {
+        const notif = document.createElement("div");
+        notif.className = `notification ${type}`;
+        notif.innerText = message;
+        document.getElementById("notificationContainer").appendChild(notif);
+        setTimeout(() => { notif.remove(); }, 5000);
+      }
+      function copyIP(elementId) {
+        const txt = document.getElementById(elementId)?.innerText.trim() || "";
+        if (!navigator.clipboard) {
+          fallbackCopy(txt);
+        } else {
+          navigator.clipboard.writeText(txt)
+            .then(() => showNotification("Copied to clipboard", "success"))
+            .catch(() => fallbackCopy(txt));
+        }
+      }
+      function fallbackCopy(text) {
+        const temp = document.createElement("textarea");
+        temp.value = text;
+        document.body.appendChild(temp);
+        temp.select();
+        try {
+          document.execCommand("copy");
+          showNotification("Copied to clipboard", "success");
+        } catch (e) {
+          showNotification("Copy failed", "error");
+        }
+        document.body.removeChild(temp);
+      }
+      function colorizeText(str) {
+        if (!str) return "";
+        let newStr = str;
+        newStr = newStr.replace(/hrs/g, `<span class="text-yellow-400">hrs</span>`);
+        newStr = newStr.replace(/mins/g, `<span class="text-yellow-400">mins</span>`);
+        newStr = newStr.replace(/\bs\b/g, `<span class="text-yellow-400">s</span>`);
+        newStr = newStr.replace(/GB/g, `<span class="text-yellow-400">GB</span>`);
+        newStr = newStr.replace(/MB/g, `<span class="text-yellow-400">MB</span>`);
+        newStr = newStr.replace(/KB/g, `<span class="text-yellow-400">KB</span>`);
+        newStr = newStr.replace(/healthy/g, `<span class="text-green-400">healthy</span>`);
+        newStr = newStr.replace(/unhealthy/g, `<span class="text-orange-400">unhealthy</span>`);
+        return newStr;
+      }
+      function setColorizedHTML(elementId, text) {
+        const el = document.getElementById(elementId);
+        if (!el) return;
+        el.innerHTML = colorizeText(text);
+      }
+      function disableRestartButtons(disabled) {
+        document.getElementById('restartContainerBtn').disabled = disabled;
+        document.getElementById('fullRestartBtn').disabled = disabled;
+      }
+      function showLoader(loaderId) {
+        document.getElementById(loaderId).style.display = 'block';
+      }
+      function hideLoader(loaderId) {
+        document.getElementById(loaderId).style.display = 'none';
+      }
+      function updateProgressBar(barId, textId, percentage) {
+        const bar = document.getElementById(barId);
+        const textEl = document.getElementById(textId);
+        if (!bar || !textEl) return;
+        bar.style.width = percentage + "%";
+        textEl.innerText = percentage + "%";
+      }
+      function formatBytes(bytes, decimals = 2) {
+        if (bytes === 0) return `0 <span class="text-yellow-400">Bytes</span>`;
+        const k = 1024;
+        const dm = decimals < 0 ? 0 : decimals;
+        const sizes = ["Bytes", "KB", "MB", "GB", "TB"];
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+        const val = parseFloat((bytes / Math.pow(k, i)).toFixed(dm));
+        return `${val} <span class="text-yellow-400">${sizes[i]}</span>`;
+      }
+      async function fetchSystemUsage() {
+        try {
+          const response = await fetch('/getinfo/system-usage');
+          const data = await response.json();
+          updateProgressBar("cpuBar", "cpuPercent", data.cpu_percent);
+          updateProgressBar("ramBar", "ramPercent", data.memory_percent);
+          updateProgressBar("swapBar", "swapPercent", data.swap_percent);
+          updateProgressBar("diskBar", "diskPercent", data.disk_percent);
+        } catch (err) {
+          console.error(err);
+        }
+      }
+      async function fetchNetworkStats() {
+        try {
+          const response = await fetch('/getinfo/network-stats');
+          const data = await response.json();
+          document.getElementById("uploadSpeed").innerHTML = formatBytes(data.upload_speed_bps);
+          document.getElementById("downloadSpeed").innerHTML = formatBytes(data.download_speed_bps);
+          document.getElementById("totalSent").innerHTML = formatBytes(data.total_bytes_sent);
+          document.getElementById("totalRecv").innerHTML = formatBytes(data.total_bytes_recv);
+          document.getElementById("tcpConnections").innerHTML = colorizeText(String(data.tcp_connections));
+          document.getElementById("udpConnections").innerHTML = colorizeText(String(data.udp_connections));
+          document.getElementById("ipv4Addr").innerText = data.ipv4;
+          document.getElementById("ipv6Addr").innerText = data.ipv6;
+        } catch (err) {
+          console.error(err);
+        }
+      }
+      async function fetchOsUptime() {
+        try {
+          const response = await fetch('/getinfo/os-uptime');
+          const data = await response.json();
+          setColorizedHTML("osUptime", data.os_uptime_formatted || "N/A");
+        } catch (err) {
+          console.error(err);
+        }
+      }
+      function fetchAll() {
+        fetchNetworkStats();
+        fetchOsUptime();
+        fetchSystemUsage();
+      }
+      async function pollUptimes(initialValues, callback) {
+        const interval = setInterval(async () => {
+          try {
+            const containerResponse = await fetch('/getinfo/container/marzneshin-marznode-1/uptime');
+            const fullResponse = await fetch('/getinfo/full-uptime');
+            const xrayResponse = await fetch('/getinfo/xray-uptime');
+            const containerData = await containerResponse.json();
+            const fullData = await fullResponse.json();
+            const xrayData = await xrayResponse.json();
+            const newValues = {
+              container: containerData.uptime_formatted,
+              full: fullData.full_uptime_formatted,
+              xray: xrayData.xray_uptime
+            };
+            if (
+              newValues.container !== initialValues.container ||
+              newValues.full !== initialValues.full ||
+              newValues.xray !== initialValues.xray
+            ) {
+              clearInterval(interval);
+              callback(newValues);
+            }
+          } catch (err) {
+            console.error(err);
+          }
+        }, 2000);
+      }
+      let containerUptimeSeconds = 0, fullUptimeSeconds = 0, xrayUptimeSeconds = 0;
+      let xrayAvailable = true;
+      function formatSeconds(seconds) {
+        const hrs = Math.floor(seconds / 3600);
+        const mins = Math.floor((seconds % 3600) / 60);
+        const secs = seconds % 60;
+        let result = "";
+        if (hrs > 0) result += hrs + " <span class='text-yellow-400'>hrs</span> ";
+        if (mins > 0 || hrs > 0) result += mins + " <span class='text-yellow-400'>mins</span> ";
+        result += secs + " <span class='text-yellow-400'>s</span>";
+        return result;
+      }
+      async function initializeUptimes() {
+        try {
+          let containerResponse = await fetch('/getinfo/container/marzneshin-marznode-1/uptime');
+          let containerData = await containerResponse.json();
+          containerUptimeSeconds = containerData.uptime_seconds || 0;
+          document.getElementById('containerUptimeValue').innerHTML = formatSeconds(containerUptimeSeconds);
+          let fullResponse = await fetch('/getinfo/full-uptime');
+          let fullData = await fullResponse.json();
+          fullUptimeSeconds = fullData.full_uptime_seconds || 0;
+          document.getElementById('fullUptimeValue').innerHTML = formatSeconds(fullUptimeSeconds);
+          let xrayResponse = await fetch('/getinfo/xray-uptime');
+          if (!xrayResponse.ok) {
+            xrayAvailable = false;
+            document.getElementById('xrayUptimeValue').innerHTML = "Not available from API";
+          } else {
+            let xrayData = await xrayResponse.json();
+            xrayUptimeSeconds = xrayData.xray_uptime_seconds || 0;
+            document.getElementById('xrayUptimeValue').innerHTML = formatSeconds(xrayUptimeSeconds);
+          }
+        } catch(e) {
+          console.error("Failed to initialize uptimes", e);
+        }
+      }
+      function startUptimeCounter() {
+        setInterval(() => {
+          containerUptimeSeconds++;
+          fullUptimeSeconds++;
+          document.getElementById('containerUptimeValue').innerHTML = formatSeconds(containerUptimeSeconds);
+          document.getElementById('fullUptimeValue').innerHTML = formatSeconds(fullUptimeSeconds);
+          if (xrayAvailable) {
+            xrayUptimeSeconds++;
+            document.getElementById('xrayUptimeValue').innerHTML = formatSeconds(xrayUptimeSeconds);
+          }
+        }, 1000);
+      }
+      function toggleExpandable(e) {
+        e.stopPropagation();
+        const content = document.getElementById('expandableContent');
+        const btn = document.getElementById('toggleExpandBtn');
+        if (content.classList.contains('hidden')) {
+          content.classList.remove('hidden');
+          btn.textContent = '▲';
+        } else {
+          content.classList.add('hidden');
+          btn.textContent = '▼';
+        }
+      }
+      let sidebarOpen = false;
+      const sidebarEl = document.getElementById('sidebar');
+      const wrapperEl = document.getElementById('wrapper');
+      const hamburgerButtonEl = document.getElementById('hamburgerButton');
+      const sidebarOverlay = document.getElementById('sidebarOverlay');
+      hamburgerButtonEl.addEventListener('click', () => {
+        sidebarOpen = !sidebarOpen;
+        if (window.innerWidth > 640) {
+          if (sidebarOpen) {
+            sidebarEl.classList.add('open');
+            sidebarOverlay.classList.add('active');
+          } else {
+            sidebarEl.classList.remove('open');
+            sidebarOverlay.classList.remove('active');
+          }
+        } else {
+          if (sidebarOpen) {
+            sidebarEl.classList.remove('closed');
+            wrapperEl.style.maxWidth = "calc(900px + 14rem)";
+            sidebarOverlay.classList.add('active');
+          } else {
+            sidebarEl.classList.add('closed');
+            wrapperEl.style.maxWidth = "900px";
+            sidebarOverlay.classList.remove('active');
+          }
+        }
+      });
+      function closeSidebar() {
+        sidebarOpen = false;
+        if (window.innerWidth > 640) {
+          sidebarEl.classList.remove('open');
+        } else {
+          sidebarEl.classList.add('closed');
+          wrapperEl.style.maxWidth = "900px";
+        }
+        sidebarOverlay.classList.remove('active');
+      }
+      window.onload = async function() {
+        if (window.innerWidth > 640) {
+          sidebarOpen = false;
+          sidebarEl.classList.remove('open');
+        } else {
+          sidebarOpen = false;
+          sidebarEl.classList.add('closed');
+          wrapperEl.style.maxWidth = "900px";
+        }
+        if (isRestartInProgress()) {
+          disableRestartButtons(true);
+        }
+        const nodeStatusEl = document.getElementById("nodeStatus");
+        if (nodeStatusEl) {
+          nodeStatusEl.innerHTML = colorizeText(nodeStatusEl.innerText);
+        }
+        await initializeUptimes();
+        startUptimeCounter();
+        fetchAll();
+        setInterval(fetchAll, 5000);
+      };
+      function setRestartFlag() { localStorage.setItem("restartInProgress", "true"); }
+      function clearRestartFlag() { localStorage.removeItem("restartInProgress"); }
+      function isRestartInProgress() { return localStorage.getItem("restartInProgress") === "true"; }
+      async function restartEndpoint(endpoint, loaderId) {
+        const response = await fetch(endpoint, { method: 'POST' });
+        const data = await response.json();
+        return data;
+      }
+      async function initiateRestart(endpoint, loaderId) {
+        if (isRestartInProgress()) return;
+        disableRestartButtons(true);
+        showLoader(loaderId);
+        setRestartFlag();
+        const startTime = Date.now();
+        const timeoutId = setTimeout(() => {
+          disableRestartButtons(false);
+          hideLoader(loaderId);
+          clearRestartFlag();
+          showNotification("Restart timed out.", "error");
+        }, 30000);
+        try {
+          await restartEndpoint(endpoint);
+        } catch (err) {
+          showNotification("Restart failed.", "error");
+          disableRestartButtons(false);
+          hideLoader(loaderId);
+          clearRestartFlag();
+          clearTimeout(timeoutId);
+          return;
+        }
+        const initContainer = await (await fetch('/getinfo/container/marzneshin-marznode-1/uptime')).json();
+        const initFull = await (await fetch('/getinfo/full-uptime')).json();
+        const initXray = await (await fetch('/getinfo/xray-uptime')).json();
+        const initialValues = {
+          container: initContainer.uptime_formatted,
+          full: initFull.full_uptime_formatted,
+          xray: initXray.xray_uptime
+        };
+        pollUptimes(initialValues, async (newValues) => {
+          clearTimeout(timeoutId);
+          const elapsed = Math.floor((Date.now() - startTime) / 1000);
+          await initializeUptimes();
+          fetchAll();
+          disableRestartButtons(false);
+          hideLoader(loaderId);
+          clearRestartFlag();
+          showNotification(`Restart successful in ${elapsed} s`, "success");
+        });
+      }
+      document.getElementById('restartContainerBtn').addEventListener('click', async () => {
+        await initiateRestart('/getinfo/container/marzneshin-marznode-1/restart', 'containerLoader');
+      });
+      document.getElementById('fullRestartBtn').addEventListener('click', async () => {
+        await initiateRestart('/getinfo/full-restart', 'fullLoader');
+      });
+
+      const changeVersionModal = document.getElementById('changeVersionModal');
+      const changeVersionBtn = document.getElementById('changeVersionBtn');
+      const changeVersionForm = document.getElementById('changeVersionForm');
+      const changeVersionModalContent = changeVersionModal.querySelector('.glass-effect');
+      const useCustomSshCheckbox = document.getElementById('useCustomSsh');
+      const customSshFieldsContainer = document.getElementById('customSshFieldsContainer');
+      const sshUseProxyCheckbox = document.getElementById('sshUseProxy');
+      const sshProxyFieldsContainer = document.getElementById('sshProxyFieldsContainer');
+      const sshXrayVersionSelect = document.getElementById('sshXrayVersionSelect');
+      const closeChangeVersionModalBtn = document.getElementById('closeChangeVersionModalBtn');
+      const changeVersionFieldset = document.getElementById('changeVersionFieldset');
+      
+      function toggleCustomSshFields() {
+        customSshFieldsContainer.classList.toggle('hidden', !useCustomSshCheckbox.checked);
+      }
+
+      function toggleSshProxyFields() {
+        sshProxyFieldsContainer.classList.toggle('hidden', !sshUseProxyCheckbox.checked);
+      }
+
+      async function populateSshXrayVersionsDropdown() {
+          sshXrayVersionSelect.innerHTML = '<option value="">Loading versions...</option>';
+          sshXrayVersionSelect.disabled = true;
+          try {
+              const response = await fetch('/get_xray_versions');
+              if (!response.ok) throw new Error(`HTTP error ${response.status}`);
+              const data = await response.json();
+              if (data.error) throw new Error(data.error);
+              
+              // Clear previous options, including the "Select..." placeholder
+              sshXrayVersionSelect.innerHTML = ''; 
+      
+              if (data.versions && data.versions.length > 0) {
+                  data.versions.forEach((version, index) => {
+                      const option = document.createElement('option');
+                      option.value = version;
+                      option.textContent = index === 0 ? `${version} (latest)` : version;
+                      sshXrayVersionSelect.appendChild(option);
+                  });
+              } else {
+                  sshXrayVersionSelect.innerHTML = '<option value="">No versions found</option>';
+              }
+          } catch (error) {
+              console.error('Failed to load Xray versions:', error);
+              sshXrayVersionSelect.innerHTML = `<option value="">Error loading versions</option>`;
+          } finally {
+              sshXrayVersionSelect.disabled = false;
+          }
+      }
+
+      function openChangeVersionModal() {
+          // Reset the form to its default state first
+          changeVersionForm.reset();
+      
+          const changeBtn = document.getElementById('changeVersionBtn');
+          const customSshToggleContainer = document.getElementById('customSshToggleContainer');
+          // Read the data attribute we added to the button
+          const isLocal = JSON.parse(changeBtn.dataset.isLocal || 'false');
+      
+          if (isLocal) {
+              // For the local node, hide the entire "Use Custom SSH" toggle section
+              customSshToggleContainer.classList.add('hidden');
+          } else {
+              // For remote nodes, make sure the toggle section is visible
+              customSshToggleContainer.classList.remove('hidden');
+          }
+      
+          // The rest of the function remains the same
+          toggleCustomSshFields(); // This will correctly hide the fields since the checkbox is reset to unchecked
+          toggleSshProxyFields(); // Also reset proxy fields visibility
+          populateSshXrayVersionsDropdown();
+          
+          // Clear any previous test results
+          const resultSpan = document.getElementById('sshProxyTestResult');
+          if (resultSpan) {
+              resultSpan.textContent = '';
+          }
+      
+          changeVersionModal.classList.remove('hidden');
+          setTimeout(() => {
+            changeVersionModalContent.classList.remove('opacity-0', 'translate-y-10');
+            changeVersionModalContent.classList.add('opacity-100', 'translate-y-0');
+          }, 10);
+      }
+
+      function closeChangeVersionModal() {
+        changeVersionModalContent.classList.remove('opacity-100', 'translate-y-0');
+        changeVersionModalContent.classList.add('opacity-0', 'translate-y-10');
+        setTimeout(() => {
+          changeVersionModal.classList.add('hidden');
+        }, 300);
+      }
+      
+      changeVersionBtn.addEventListener('click', openChangeVersionModal);
+      closeChangeVersionModalBtn.addEventListener('click', closeChangeVersionModal);
+      document.getElementById('cancelChangeVersionBtn').addEventListener('click', closeChangeVersionModal);
+
+      changeVersionForm.addEventListener('submit', async (event) => {
+        event.preventDefault();
+        
+        const selectedVersion = sshXrayVersionSelect.value;
+        if (!selectedVersion) {
+            showNotification('Please select an Xray version to install.', 'error');
+            return;
+        }
+
+        changeVersionFieldset.disabled = true;
+        closeChangeVersionModalBtn.disabled = true;
+        
+        const submitBtn = document.getElementById('submitChangeVersionBtn');
+        submitBtn.innerHTML = `
+          <svg class="animate-spin -ml-1 mr-3 h-5 w-5 text-white inline" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+          </svg>
+          Running...`;
+
+        const data = {
+          useCustomSsh: useCustomSshCheckbox.checked,
+          serverIP: document.getElementById('sshServerIP').value,
+          sshUser: document.getElementById('sshUser').value,
+          sshPassword: document.getElementById('sshPassword').value,
+          sshPort: document.getElementById('sshPort').value,
+          selectedXrayVersion: selectedVersion,
+          useProxy: sshUseProxyCheckbox.checked,
+          proxyIP: document.getElementById('sshProxyIP').value,
+          proxyPort: document.getElementById('sshProxyPort').value,
+          proxyUser: document.getElementById('sshProxyUser').value,
+          proxyPassword: document.getElementById('sshProxyPassword').value
+        };
+
+        try {
+          const response = await fetch(`/node/{{ node_id }}/change_xray_version`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data),
+          });
+          const result = await response.json();
+          if (response.ok && result.success) {
+            showNotification('Xray core updated successfully! Page will refresh in 20 seconds.', 'success');
+            setTimeout(() => {
+              window.location.reload();
+            }, 20000);
+          } else {
+            showNotification(result.error || 'An unknown error occurred.', 'error');
+            changeVersionFieldset.disabled = false;
+            closeChangeVersionModalBtn.disabled = false;
+            submitBtn.innerHTML = 'Change Version';
+          }
+        } catch (error) {
+          showNotification(`Client-side Error: ${error.message}`, 'error');
+          changeVersionFieldset.disabled = false;
+          closeChangeVersionModalBtn.disabled = false;
+          submitBtn.innerHTML = 'Change Version';
+        }
+      });
+
+      // --- NEW: System Command Logic ---
+      async function executeSystemCommand(command, buttonElement) {
+          const originalText = buttonElement.textContent;
+          const confirmationMessage = command === 'reboot' 
+              ? 'Are you sure you want to reboot the entire VPS? This will cause a service interruption.'
+              : 'Are you sure you want to clear the system cache?';
+              
+          if (!confirm(confirmationMessage)) {
+              return;
+          }
+
+          buttonElement.disabled = true;
+          buttonElement.innerHTML = `
+            <svg class="animate-spin -ml-1 mr-2 h-4 w-4 text-white inline" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+            </svg>
+            Running...`;
+          
+          try {
+              const response = await fetch(`/node/{{ node_id }}/system_command`, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ command: command }),
+              });
+              const result = await response.json();
+              
+              if (response.ok && result.success) {
+                  showNotification(result.message, 'success');
+              } else {
+                  showNotification(result.error || 'An unknown error occurred.', 'error');
+              }
+
+          } catch (error) {
+              showNotification(`Client-side Error: ${error.message}`, 'error');
+          } finally {
+              buttonElement.disabled = false;
+              buttonElement.innerHTML = originalText;
+          }
+      }
+
+      const rebootVpsBtn = document.getElementById('rebootVpsBtn');
+      if (rebootVpsBtn) { // Check if the button exists before adding listener
+          rebootVpsBtn.addEventListener('click', function() {
+              executeSystemCommand('reboot', this);
+          });
+      }
+
+      document.getElementById('clearCacheBtn').addEventListener('click', function() {
+          executeSystemCommand('clear_cache', this);
+      });
+      
+      useCustomSshCheckbox.addEventListener('change', toggleCustomSshFields);
+      sshUseProxyCheckbox.addEventListener('change', toggleSshProxyFields);
+
+      async function testSshAndProxyForChangeVersion() {
+          const useCustomSsh = document.getElementById('useCustomSsh').checked;
+          
+          // Get all fields, they might be empty but we send them anyway
+          const serverIP = document.getElementById('sshServerIP').value;
+          const sshPort = document.getElementById('sshPort').value;
+          const sshUser = document.getElementById('sshUser').value;
+          const sshPassword = document.getElementById('sshPassword').value;
+      
+          const useProxy = document.getElementById('sshUseProxy').checked;
+          const proxyIP = document.getElementById('sshProxyIP').value;
+          const proxyPort = document.getElementById('sshProxyPort').value;
+          const proxyUser = document.getElementById('sshProxyUser').value;
+          const proxyPassword = document.getElementById('sshProxyPassword').value;
+          
+          const resultSpan = document.getElementById('sshProxyTestResult');
+          const testButton = document.getElementById('sshTestConnectionBtn');
+      
+          // Basic validation for custom fields if the toggle is on
+          if (useCustomSsh && (!serverIP || !sshPort || !sshUser || !sshPassword)) {
+              resultSpan.textContent = 'Custom SSH IP, Port, User, and Password are required.';
+              resultSpan.className = 'text-sm text-red-400';
+              return;
+          }
+          
+          resultSpan.textContent = 'Testing connection...';
+          resultSpan.className = 'text-sm text-yellow-400';
+          testButton.disabled = true;
+          testButton.textContent = 'Testing...';
+      
+          const payload = {
+              node_id: {{ node_id }}, // Send the current node_id
+              use_custom_ssh: useCustomSsh,
+              ssh_ip: serverIP, 
+              ssh_port: sshPort, 
+              ssh_user: sshUser, 
+              ssh_pass: sshPassword,
+              use_proxy: useProxy,
+              proxy_ip: proxyIP, 
+              proxy_port: proxyPort, 
+              proxy_user: proxyUser, 
+              proxy_pass: proxyPassword
+          };
+      
+          try {
+              const response = await fetch('/test_full_connection', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify(payload),
+              });
+              const result = await response.json();
+              let message = "";
+              let overallSuccess = false;
+      
+              if (useProxy) {
+                  message += `Proxy: ${result.proxy_status === 'success' ? `OK` : `Failed (${result.proxy_message || ''})`} | `;
+              }
+              message += `SSH: ${result.ssh_status === 'success' ? 'OK' : `Failed (${result.ssh_message || ''})`}`;
+      
+              if (result.ssh_status === 'success' && (result.proxy_status === 'success' || !useProxy)) {
+                  overallSuccess = true;
+              }
+      
+              resultSpan.textContent = message;
+              resultSpan.className = `text-sm ${overallSuccess ? 'text-green-400' : 'text-red-400'}`;
+      
+          } catch (error) {
+              console.error('Error testing connection:', error);
+              resultSpan.textContent = `Test Error: ${error.message}`;
+              resultSpan.className = 'text-sm text-red-400';
+          } finally {
+              testButton.disabled = false;
+              testButton.textContent = 'Test Proxy';
+          }
+      }
+
+      // Add event listener for the new button
+      const testBtn = document.getElementById('sshTestConnectionBtn');
+      if(testBtn) {
+          testBtn.addEventListener('click', testSshAndProxyForChangeVersion);
+      }
+
+    </script>
+  </body>
+</html>

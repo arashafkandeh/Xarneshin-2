@@ -830,7 +830,7 @@ def add_node_ssh():
     logger.info(f"  - SSH User: {ssh_user}, Xray Version: {selected_xray_version}, Use Proxy: {use_proxy}")
 
     local_script_path = "/opt/Xenon.xray/assets/setup_node.sh"
-    remote_script_path = "/root/marznode/setup_node.sh"
+    remote_script_path = "/root/setup_node.sh"
 
     if not os.path.exists(local_script_path):
         error_msg = f"Source setup script file not found at {local_script_path}."
@@ -873,13 +873,6 @@ def add_node_ssh():
             logger.info(f"SSH connection established to {server_ip} {'via proxy' if use_proxy else ''}")
             yield f"data: {json.dumps({'line': 'SSH connection successful.'})}\n\n"
             
-            # Create remote directory
-            logger.info("Ensuring remote directory '/root/marznode/' exists.")
-            stdin, stdout, stderr = ssh_client.exec_command("mkdir -p /root/marznode")
-            if stdout.channel.recv_exit_status() != 0:
-                raise Exception(f"Failed to create remote directory. Error: {stderr.read().decode().strip()}")
-            yield f"data: {json.dumps({'line': 'Remote directory prepared.'})}\n\n"
-
             # Upload and prepare script
             logger.info(f"Uploading script to '{remote_script_path}'")
             sftp_client = ssh_client.open_sftp()
@@ -908,17 +901,21 @@ def add_node_ssh():
             
             stdin_chan, stdout_chan, stderr_chan = ssh_client.exec_command(command, get_pty=True)
             
-            # Stream output
+            # Stream output and capture it for logging
+            stdout_lines = []
+            stderr_lines = []
             while not stdout_chan.channel.exit_status_ready():
                 if stdout_chan.channel.recv_ready():
                     line = stdout_chan.channel.recv(1024).decode('utf-8', errors='ignore').strip()
                     if line:
-                        logger.debug(f"Script STDOUT: {line}")
+                        logger.info(f"Script STDOUT: {line}") # Changed from debug to info
+                        stdout_lines.append(line)
                         yield f"data: {json.dumps({'line': line})}\n\n"
                 if stdout_chan.channel.recv_stderr_ready():
                     line = stderr_chan.channel.recv_stderr(1024).decode('utf-8', errors='ignore').strip()
                     if line:
-                        logger.warning(f"Script STDERR: {line}")
+                        logger.error(f"Script STDERR: {line}") # Changed from warning to error
+                        stderr_lines.append(line)
                         yield f"data: {json.dumps({'error_line': line})}\n\n"
                 time.sleep(0.1)
 
@@ -939,6 +936,12 @@ def add_node_ssh():
                 node_details = {"name": node_name, "address": server_ip, "port": node_xray_port_str}
                 yield f"data: {json.dumps({'status': 'completed', 'exit_code': 0, 'message': success_message, 'node_details': node_details})}\n\n"
             else:
+                # Log the captured output for debugging
+                full_stdout = "\\n".join(stdout_lines)
+                full_stderr = "\\n".join(stderr_lines)
+                logger.error(f"Node setup script for '{node_name}' failed. Full STDOUT: {full_stdout}")
+                logger.error(f"Node setup script for '{node_name}' failed. Full STDERR: {full_stderr}")
+
                 error_message = f"Node setup script failed for '{node_name}' with exit status: {exit_status}."
                 logger.error(error_message)
                 sentry_sdk.capture_message(error_message, level="error")
